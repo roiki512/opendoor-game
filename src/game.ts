@@ -159,8 +159,6 @@ export class Game {
         this.paused = false;
       } else if (hit(PAUSE_BUTTONS.restart)) {
         this.startRun();
-      } else if (hit(PAUSE_BUTTONS.leaderboard)) {
-        this.openBoard();
       } else if (hit(PAUSE_BUTTONS.menu)) {
         this.goToTitle();
       }

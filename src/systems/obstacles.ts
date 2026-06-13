@@ -25,11 +25,18 @@ interface KindSpec {
 
 const SPECS: Record<ObstacleKind, KindSpec> = {
   wreckedHouse: { w: 38, h: 36, clearance: 0, extraSpeed: 0, minTier: 0 },
-  downGraph: { w: 42, h: 22, clearance: 0, extraSpeed: 0, minTier: 0 },
+  // downGraph floats around a mid clearance and bobs up/down (see hitbox) — a
+  // volatile little chart you still clear by jumping.
+  downGraph: { w: 42, h: 22, clearance: 12, extraSpeed: 0, minTier: 0 },
   paper: { w: 40, h: 30, clearance: 34, extraSpeed: 0, minTier: 0 },
-  flyingHouse: { w: 44, h: 30, clearance: 34, extraSpeed: 130, minTier: 1 },
-  bear: { w: 44, h: 34, clearance: 0, extraSpeed: 95, minTier: 2 },
+  // extraSpeed kept modest so these faster movers can't overtake a slower
+  // obstacle ahead of them (which could force an impossible jump+duck).
+  flyingHouse: { w: 44, h: 30, clearance: 34, extraSpeed: 60, minTier: 1 },
+  bear: { w: 44, h: 34, clearance: 0, extraSpeed: 55, minTier: 2 },
 };
+
+/** Vertical bob (px; negative = up) applied to some obstacles. */
+const BOB_AMPLITUDE = 12;
 
 export class Obstacle {
   x: number;
@@ -55,7 +62,13 @@ export class Obstacle {
   /** AABB in screen space; groundY sampled at the obstacle's x. */
   hitbox(groundY: number): Box {
     const s = this.spec;
-    const bob = this.kind === 'flyingHouse' ? Math.sin(this.spin) * 3 : 0;
+    let bob = 0;
+    if (this.kind === 'flyingHouse') {
+      bob = Math.sin(this.spin) * 3;
+    } else if (this.kind === 'downGraph') {
+      // Undulate up and down as it travels — traces a chart-like wave.
+      bob = Math.sin(this.x * 0.013) * BOB_AMPLITUDE;
+    }
     return {
       x: this.x - s.w / 2,
       y: groundY - s.clearance - s.h + bob,
@@ -384,9 +397,10 @@ export class ObstacleSpawner {
         TUNING.spawnIntervalStart -
         (TUNING.spawnIntervalStart - TUNING.spawnIntervalMin) * difficulty;
       const jitter = 1 + (Math.random() * 2 - 1) * TUNING.spawnJitter;
-      // Normalize by speed a little so high speed doesn't wall you in.
+      // Normalize by speed a little so high speed doesn't wall you in. The
+      // floor guarantees enough time to land a jump before the next obstacle.
       const speedComp = Math.sqrt(scrollSpeed / TUNING.baseScroll);
-      this.nextSpawnIn = Math.max(0.62 - endless * 0.12, (base * jitter) / speedComp);
+      this.nextSpawnIn = Math.max(0.78 - endless * 0.08, (base * jitter) / speedComp);
     }
   }
 

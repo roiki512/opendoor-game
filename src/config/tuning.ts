@@ -51,7 +51,7 @@ export const TUNING = {
   // Cluster combos — at higher difficulty an obstacle sometimes brings a
   // complementary partner (a jump then a duck, or vice versa) close behind.
   clusterChanceMax: 0.4, // partner chance at full difficulty
-  clusterGap: 0.62, // seconds between the pair
+  clusterGap: 0.75, // seconds between the pair (enough to land a jump, then duck)
   startGrace: 2.4, // calm seconds at the start of a run before the first short
 
   // Collectible pickups

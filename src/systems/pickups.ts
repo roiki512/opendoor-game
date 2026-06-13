@@ -2,15 +2,16 @@ import { TUNING } from '../config/tuning';
 import type { Box } from './player';
 
 // Collectibles floating along the path:
-//  - 'rocket' (🚀, rare)          -> short speed boost + shield
-//  - 'logo'   (Opendoor open-door) -> instant price bump
+//  - 'rocket' (🚀, rare)        -> short speed boost + shield
+//  - 'pill'   ("AI pill" capsule) -> instant price bump
+//    (a wink at Opendoor calling itself one of the most "AI-pilled" companies)
 // They float at jump height so you grab them mid-air — risk vs. reward.
 
-export type PickupKind = 'rocket' | 'logo';
+export type PickupKind = 'rocket' | 'pill';
 
 const ROCKET_SIZE = 26;
-const LOGO_W = 22;
-const LOGO_H = 26;
+const PILL_W = 34;
+const PILL_H = 18;
 
 export class Pickup {
   x: number;
@@ -34,8 +35,8 @@ export class Pickup {
 
   hitbox(groundY: number): Box {
     const bob = Math.sin(this.spin) * 4;
-    const w = this.kind === 'rocket' ? ROCKET_SIZE : LOGO_W;
-    const h = this.kind === 'rocket' ? ROCKET_SIZE : LOGO_H;
+    const w = this.kind === 'rocket' ? ROCKET_SIZE : PILL_W;
+    const h = this.kind === 'rocket' ? ROCKET_SIZE : PILL_H;
     // Generous grab box — picking up should feel easy
     return {
       x: this.x - w / 2 - 6,
@@ -70,31 +71,50 @@ export class Pickup {
       ctx.fillRect(-ROCKET_SIZE * 0.8, ROCKET_SIZE * 0.45, 3, 3);
       ctx.fillRect(-ROCKET_SIZE * 0.62, ROCKET_SIZE * 0.6, 2.5, 2.5);
     } else {
-      // Opendoor open-door logo: blue door frame, panel swung open,
-      // light spilling out of the doorway.
-      const breathe = 1 + Math.sin(this.spin * 0.9) * 0.07;
+      // "AI pill" capsule — a two-tone medicine pill with AI on it.
+      const breathe = 1 + Math.sin(this.spin * 0.9) * 0.06;
       ctx.scale(breathe, breathe);
-      ctx.shadowColor = '#1c85e8';
+      ctx.rotate(-0.32 + Math.sin(this.spin * 0.7) * 0.08); // jaunty tilt
+      const w = PILL_W;
+      const h = PILL_H;
+      const r = h / 2;
+      ctx.shadowColor = '#39c2ff';
       ctx.shadowBlur = 14;
-      // Glowing doorway
-      ctx.fillStyle = '#bfe3ff';
-      ctx.fillRect(-LOGO_W / 2, -LOGO_H / 2, LOGO_W, LOGO_H);
-      // Frame
-      ctx.strokeStyle = '#1c85e8';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(-LOGO_W / 2, -LOGO_H / 2, LOGO_W, LOGO_H);
-      // Door panel swung open (toward the viewer-left)
-      ctx.fillStyle = '#1c85e8';
+
+      // Capsule body, clipped so each half gets its own color
       ctx.beginPath();
-      ctx.moveTo(-LOGO_W / 2, -LOGO_H / 2);
-      ctx.lineTo(-LOGO_W / 2 - 9, -LOGO_H / 2 + 6);
-      ctx.lineTo(-LOGO_W / 2 - 9, LOGO_H / 2 + 6);
-      ctx.lineTo(-LOGO_W / 2, LOGO_H / 2);
-      ctx.closePath();
-      ctx.fill();
-      // Knob
-      ctx.fillStyle = '#0a1322';
-      ctx.fillRect(-LOGO_W / 2 - 7, 1, 2.5, 2.5);
+      ctx.roundRect(-w / 2, -h / 2, w, h, r);
+      ctx.save();
+      ctx.clip();
+      ctx.fillStyle = '#1c85e8'; // Opendoor blue half (left)
+      ctx.fillRect(-w / 2, -h / 2, w / 2, h);
+      ctx.fillStyle = '#eef6ff'; // white half (right)
+      ctx.fillRect(0, -h / 2, w / 2, h);
+      // Glossy highlight along the top
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+      ctx.fillRect(-w / 2 + 3, -h / 2 + 2, w - 6, 3);
+      ctx.restore();
+
+      // Seam + outline
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#0a3a66';
+      ctx.lineWidth = 2;
+      ctx.stroke(); // outline of the capsule path
+      ctx.beginPath();
+      ctx.moveTo(0, -h / 2);
+      ctx.lineTo(0, h / 2);
+      ctx.stroke();
+
+      // "AI" lettering, half on each side for contrast
+      ctx.font = `bold 11px "Courier New", monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#eef6ff';
+      ctx.fillText('A', -w * 0.25, 1);
+      ctx.fillStyle = '#1c85e8';
+      ctx.fillText('I', w * 0.25, 1);
+      ctx.textBaseline = 'alphabetic';
+      ctx.textAlign = 'left';
     }
     ctx.restore();
   }
@@ -133,8 +153,8 @@ export class PickupSpawner {
 
     this.nextSpawnIn -= dt;
     if (this.nextSpawnIn <= 0) {
-      // Rockets are the rare one; logos are the common drop.
-      const kind: PickupKind = Math.random() < TUNING.rocketChance ? 'rocket' : 'logo';
+      // Rockets are the rare one; pills are the common drop.
+      const kind: PickupKind = Math.random() < TUNING.rocketChance ? 'rocket' : 'pill';
       this.pickups.push(new Pickup(TUNING.width + 60, kind));
       this.nextSpawnIn =
         TUNING.pickupIntervalMin +

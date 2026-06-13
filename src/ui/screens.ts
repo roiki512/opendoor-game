@@ -121,8 +121,8 @@ export function drawHowTo(ctx: CanvasRenderingContext2D) {
   sectionHead(ctx, 'POWER-UPS', lx, 318);
   spriteRow(
     ctx,
-    (x, y) => drawPickupIcon(ctx, 'logo', x, y, 0.9),
-    'OPENDOOR LOGO — instant price bump',
+    (x, y) => drawPickupIcon(ctx, 'pill', x, y, 0.9),
+    'AI PILL — instant price bump',
     lx + 16,
     lx + 40,
     350
@@ -317,14 +317,10 @@ export interface ButtonRect {
   label: string;
 }
 
-export const PAUSE_BUTTONS: Record<
-  'resume' | 'restart' | 'leaderboard' | 'menu',
-  ButtonRect
-> = {
-  resume: { x: W / 2 - 115, y: 198, w: 230, h: 44, label: 'CONTINUE' },
-  restart: { x: W / 2 - 115, y: 250, w: 230, h: 44, label: 'RESTART RUN' },
-  leaderboard: { x: W / 2 - 115, y: 302, w: 230, h: 44, label: '🏆 LEADERBOARD' },
-  menu: { x: W / 2 - 115, y: 354, w: 230, h: 44, label: 'MAIN MENU' },
+export const PAUSE_BUTTONS: Record<'resume' | 'restart' | 'menu', ButtonRect> = {
+  resume: { x: W / 2 - 115, y: 226, w: 230, h: 46, label: 'CONTINUE' },
+  restart: { x: W / 2 - 115, y: 286, w: 230, h: 46, label: 'RESTART RUN' },
+  menu: { x: W / 2 - 115, y: 346, w: 230, h: 46, label: 'MAIN MENU' },
 };
 
 /** Shared button look used by the pause/title/board menus. */
@@ -343,7 +339,7 @@ function drawButton(ctx: CanvasRenderingContext2D, b: ButtonRect, size = 17) {
 
 export function drawPauseMenu(ctx: CanvasRenderingContext2D) {
   dim(ctx, 0.72);
-  centered(ctx, 'TRADING HALTED', 165, 34, '#f3eee4', true);
+  centered(ctx, 'TRADING HALTED', 175, 36, '#f3eee4', true);
   for (const b of Object.values(PAUSE_BUTTONS)) drawButton(ctx, b);
   centered(ctx, '(ESC or P to resume)', 426, 12, 'rgba(150, 190, 230, 0.7)', false, '');
 }
