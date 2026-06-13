@@ -50,16 +50,21 @@ export const TUNING = {
 
   // Cluster combos — at higher difficulty an obstacle sometimes brings a
   // complementary partner (a jump then a duck, or vice versa) close behind.
-  clusterChanceMax: 0.4, // partner chance at full difficulty
+  clusterChanceMax: 0.45, // partner chance at full difficulty
   clusterGap: 0.75, // seconds between the pair (enough to land a jump, then duck)
   startGrace: 2.4, // calm seconds at the start of a run before the first short
+
+  // "EARNINGS DAY" volatility surges — periodic combo-dense bursts.
+  surgeDuration: 5, // seconds a surge lasts
+  surgeFirst: 16, // seconds into a run before the first surge
+  surgeInterval: 22, // seconds between surges
+  surgeIntervalJitter: 6, // +/- randomness on the gap
 
   // Collectible pickups
   pickupPriceBoost: 1.06, // Opendoor logo: instant +6% on the price
   rocketChance: 0.3, // chance a spawned pickup is the rare rocket
   rocketBoostMult: 1.4, // rocket: extra speed/climb multiplier while active
   rocketBoostTime: 3.5, // seconds the rocket boost lasts
-  pickupShieldTime: 4, // seconds of shield from a rocket
   pickupIntervalMin: 7, // seconds between pickup spawns (random in range)
   pickupIntervalMax: 14,
 

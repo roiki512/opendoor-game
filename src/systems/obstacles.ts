@@ -2,9 +2,10 @@ import { TUNING } from '../config/tuning';
 import type { Box } from './player';
 
 // The shorts' arsenal. Heights are relative to the ground line:
-//  - 'wreckedHouse' and 'downGraph' sit on the ground -> must JUMP
-//  - 'paper' and 'flyingHouse' fly high -> must DUCK (standing height 46
-//    clips them, duck height 26 clears under their bottom edge at 34px)
+//  - 'wreckedHouse', 'bear' sit on the ground -> must JUMP
+//  - 'paper', 'flyingHouse' fly high -> must DUCK
+//  - 'downGraph' is random per spawn: a small ground chart (JUMP) or a tall
+//    hanging crash-wall too high to clear (DUCK) — you must read it fast
 export type ObstacleKind =
   | 'wreckedHouse'
   | 'downGraph'
@@ -25,9 +26,10 @@ interface KindSpec {
 
 const SPECS: Record<ObstacleKind, KindSpec> = {
   wreckedHouse: { w: 38, h: 36, clearance: 0, extraSpeed: 0, minTier: 0 },
-  // downGraph floats around a mid clearance and bobs up/down (see hitbox) — a
-  // volatile little chart you still clear by jumping.
-  downGraph: { w: 42, h: 22, clearance: 12, extraSpeed: 0, minTier: 0 },
+  // downGraph spawns in one of two random forms (see Obstacle): a small chart on
+  // the GROUND (jump) or a tall hanging crash-wall (duck). This spec is the
+  // ground form; the tall form is DOWNGRAPH_HIGH below.
+  downGraph: { w: 42, h: 22, clearance: 0, extraSpeed: 0, minTier: 0 },
   paper: { w: 40, h: 30, clearance: 34, extraSpeed: 0, minTier: 0 },
   // extraSpeed kept modest so these faster movers can't overtake a slower
   // obstacle ahead of them (which could force an impossible jump+duck).
@@ -35,22 +37,44 @@ const SPECS: Record<ObstacleKind, KindSpec> = {
   bear: { w: 44, h: 34, clearance: 0, extraSpeed: 55, minTier: 2 },
 };
 
-/** Vertical bob (px; negative = up) applied to some obstacles. */
-const BOB_AMPLITUDE = 12;
+// Tall "crash wall" form of downGraph: its top sits above the jump apex (~112px)
+// so it CANNOT be jumped — you must duck under it.
+const DOWNGRAPH_HIGH = { clearance: 34, h: 96 };
+// Post-$82, rival houses swoop upward and back down as they travel (px).
+const FLYINGHOUSE_SWOOP = 18;
 
 export class Obstacle {
   x: number;
   kind: ObstacleKind;
   spin = Math.random() * Math.PI * 2;
   fleeing = false;
+  /** downGraph only: true = tall hanging wall (DUCK), false = ground (JUMP). */
+  duckVariant = false;
+  /** flyingHouse only: post-$82 vertical swoop. */
+  swoop = false;
 
   constructor(kind: ObstacleKind, x: number) {
     this.kind = kind;
     this.x = x;
+    if (kind === 'downGraph') this.duckVariant = Math.random() < 0.5;
   }
 
   get spec(): KindSpec {
     return SPECS[this.kind];
+  }
+
+  /** Bottom-edge clearance, accounting for the downGraph variant. */
+  get effClearance(): number {
+    if (this.kind === 'downGraph') return this.duckVariant ? DOWNGRAPH_HIGH.clearance : 0;
+    return SPECS[this.kind].clearance;
+  }
+  get effHeight(): number {
+    if (this.kind === 'downGraph' && this.duckVariant) return DOWNGRAPH_HIGH.h;
+    return SPECS[this.kind].h;
+  }
+  /** A "high" obstacle must be ducked under (vs. a ground one you jump over). */
+  get isHigh(): boolean {
+    return this.effClearance > 0;
   }
 
   update(dt: number, scrollSpeed: number) {
@@ -61,19 +85,19 @@ export class Obstacle {
 
   /** AABB in screen space; groundY sampled at the obstacle's x. */
   hitbox(groundY: number): Box {
-    const s = this.spec;
+    const w = SPECS[this.kind].w;
+    const h = this.effHeight;
     let bob = 0;
     if (this.kind === 'flyingHouse') {
-      bob = Math.sin(this.spin) * 3;
-    } else if (this.kind === 'downGraph') {
-      // Undulate up and down as it travels — traces a chart-like wave.
-      bob = Math.sin(this.x * 0.013) * BOB_AMPLITUDE;
+      bob = this.swoop
+        ? -(Math.sin(this.x * 0.012) * 0.5 + 0.5) * FLYINGHOUSE_SWOOP // swoop up & back
+        : Math.sin(this.spin) * 3;
     }
     return {
-      x: this.x - s.w / 2,
-      y: groundY - s.clearance - s.h + bob,
-      w: s.w,
-      h: s.h,
+      x: this.x - w / 2,
+      y: groundY - this.effClearance - h + bob,
+      w,
+      h,
     };
   }
 
@@ -142,33 +166,41 @@ export class Obstacle {
         break;
       }
       case 'downGraph': {
-        // A little red stock chart trending down — the bears' favorite art.
-        // Frame
+        // A red crashing chart. Small + on the ground = JUMP it; tall + hanging
+        // (the duck variant) = DUCK under it. The art scales to the box.
         ctx.fillStyle = 'rgba(20, 8, 10, 0.85)';
         ctx.fillRect(b.x, b.y, b.w, b.h);
         ctx.strokeStyle = '#ff4646';
         ctx.lineWidth = 1.5;
         ctx.strokeRect(b.x, b.y, b.w, b.h);
-        // Declining line
+        // Declining zig-zag spanning the whole box
+        const pts: [number, number][] = [
+          [0.08, 0.12],
+          [0.3, 0.34],
+          [0.45, 0.24],
+          [0.66, 0.6],
+          [0.78, 0.48],
+          [0.92, 0.9],
+        ];
         ctx.strokeStyle = '#ff4646';
         ctx.lineWidth = 2.5;
         ctx.shadowColor = '#ff4646';
         ctx.shadowBlur = 8;
         ctx.beginPath();
-        ctx.moveTo(b.x + 3, b.y + 4);
-        ctx.lineTo(b.x + b.w * 0.3, b.y + 9);
-        ctx.lineTo(b.x + b.w * 0.45, b.y + 6);
-        ctx.lineTo(b.x + b.w * 0.7, b.y + 14);
-        ctx.lineTo(b.x + b.w * 0.8, b.y + 11);
-        ctx.lineTo(b.x + b.w - 3, b.y + b.h - 4);
+        ctx.moveTo(b.x + pts[0][0] * b.w, b.y + pts[0][1] * b.h);
+        for (let i = 1; i < pts.length; i++) {
+          ctx.lineTo(b.x + pts[i][0] * b.w, b.y + pts[i][1] * b.h);
+        }
         ctx.stroke();
         ctx.shadowBlur = 0;
-        // Arrowhead at the end of the decline
+        // Arrowhead at the bottom-right end of the decline
+        const ex = b.x + 0.92 * b.w;
+        const ey = b.y + 0.9 * b.h;
         ctx.fillStyle = '#ff4646';
         ctx.beginPath();
-        ctx.moveTo(b.x + b.w - 1, b.y + b.h - 1);
-        ctx.lineTo(b.x + b.w - 9, b.y + b.h - 3);
-        ctx.lineTo(b.x + b.w - 3, b.y + b.h - 9);
+        ctx.moveTo(ex + 2, ey + 2);
+        ctx.lineTo(ex - 7, ey);
+        ctx.lineTo(ex, ey - 7);
         ctx.closePath();
         ctx.fill();
         break;
@@ -273,29 +305,28 @@ export class Obstacle {
         break;
       }
       case 'flyingHouse': {
-        // A rival house airlifted by rotors — flying competition.
-        const bob = Math.sin(this.spin) * 3;
-        ctx.translate(0, bob);
+        // A rival house airlifted by rotors — flying competition. Everything is
+        // drawn relative to b (the hitbox), so the post-$82 swoop carries it.
         const hx = b.x + 6;
         const hw = b.w - 12;
         const roofH = 9;
-        const bodyY = b.y - bob + roofH + 5;
+        const bodyY = b.y + roofH + 5;
         const bodyH = b.h - roofH - 5;
-        // Rotors
+        // Rotors at the top of the box
         ctx.strokeStyle = '#9aa0ab';
         ctx.lineWidth = 2;
         const rotor = Math.abs(Math.sin(this.spin * 8)) * (b.w * 0.26) + 3;
         ctx.beginPath();
-        ctx.moveTo(cx - rotor, b.y - bob);
-        ctx.lineTo(cx + rotor, b.y - bob);
-        ctx.moveTo(cx, b.y - bob);
-        ctx.lineTo(cx, b.y - bob + 5);
+        ctx.moveTo(cx - rotor, b.y);
+        ctx.lineTo(cx + rotor, b.y);
+        ctx.moveTo(cx, b.y);
+        ctx.lineTo(cx, b.y + 5);
         ctx.stroke();
         // Roof (red — it's the competition)
         ctx.fillStyle = '#b8232e';
         ctx.beginPath();
         ctx.moveTo(hx - 3, bodyY);
-        ctx.lineTo(cx, b.y - bob + 5);
+        ctx.lineTo(cx, b.y + 5);
         ctx.lineTo(hx + hw + 3, bodyY);
         ctx.closePath();
         ctx.fill();
@@ -321,25 +352,36 @@ export class ObstacleSpawner {
   private nextSpawnIn: number = TUNING.startGrace;
   /** First obstacle of a run never clusters — eases new players in. */
   private firstSpawnDone = false;
-  /** A complementary partner queued behind the last spawn (cluster combo). */
-  private pending: ObstacleKind | null = null;
+  /** Partners queued behind the last spawn (cluster / triple combo). */
+  private queue: ObstacleKind[] = [];
   private pendingIn = 0;
+  /** True once past the configured roster ($82) — unlocks swooping rivals. */
+  private postAth = false;
   squeezeTime = 0;
+  /** EARNINGS DAY volatility burst — combo-heavy while it lasts. */
+  surgeTime = 0;
 
   reset() {
     this.obstacles = [];
     this.nextSpawnIn = TUNING.startGrace;
     this.firstSpawnDone = false;
-    this.pending = null;
+    this.queue = [];
     this.pendingIn = 0;
+    this.postAth = false;
     this.squeezeTime = 0;
+    this.surgeTime = 0;
   }
 
   startSqueeze() {
     this.squeezeTime = TUNING.squeezeDuration;
-    this.pending = null;
+    this.queue = [];
     this.pendingIn = 0;
     for (const o of this.obstacles) o.fleeing = true;
+  }
+
+  /** Kick off an EARNINGS DAY surge (a short, combo-dense burst). */
+  startSurge() {
+    if (this.squeezeTime <= 0) this.surgeTime = TUNING.surgeDuration;
   }
 
   /**
@@ -349,6 +391,8 @@ export class ObstacleSpawner {
    */
   update(dt: number, scrollSpeed: number, progress: number, totalTiers: number) {
     if (this.squeezeTime > 0) this.squeezeTime -= dt;
+    if (this.surgeTime > 0) this.surgeTime -= dt;
+    this.postAth = progress >= totalTiers;
 
     for (const o of this.obstacles) o.update(dt, scrollSpeed);
     this.obstacles = this.obstacles.filter(
@@ -357,12 +401,12 @@ export class ObstacleSpawner {
 
     if (this.squeezeTime > 0) return; // no spawns during the squeeze
 
-    // Release a queued cluster partner first; hold the main timer until it's out.
-    if (this.pending) {
+    // Release queued cluster partners first; hold the main timer until they're out.
+    if (this.queue.length > 0) {
       this.pendingIn -= dt;
       if (this.pendingIn <= 0) {
-        this.obstacles.push(new Obstacle(this.pending, TUNING.width + 80));
-        this.pending = null;
+        this.spawnKind(this.queue.shift()!);
+        if (this.queue.length > 0) this.pendingIn = TUNING.clusterGap;
       }
       return;
     }
@@ -371,23 +415,33 @@ export class ObstacleSpawner {
     const difficulty = Math.min(1, progress / Math.max(1, totalTiers - 1));
     // Past the roster, keep creeping difficulty up so endless mode stays tense.
     const endless = Math.min(0.5, Math.max(0, progress - totalTiers) * 0.04);
+    const surging = this.surgeTime > 0;
 
     this.nextSpawnIn -= dt;
     if (this.nextSpawnIn <= 0) {
-      const kind = this.spawn(tier);
+      const primary = this.spawnRandom(tier);
       const wasFirst = !this.firstSpawnDone;
       this.firstSpawnDone = true;
 
-      // Maybe bring a complementary partner -> a jump-then-duck (or duck-then-
-      // jump) combo. Chance grows with difficulty and keeps climbing endlessly.
-      // The very first obstacle of a run never clusters.
-      const clusterChance = wasFirst
-        ? 0
-        : Math.min(0.7, TUNING.clusterChanceMax * difficulty + endless);
+      // Maybe bring complementary partner(s) -> jump<->duck combos. Surges are
+      // almost always combos; difficulty/endless push it up otherwise. The very
+      // first obstacle of a run never clusters.
+      let clusterChance = Math.min(0.72, TUNING.clusterChanceMax * difficulty + endless);
+      if (surging) clusterChance = 0.95;
+      if (wasFirst) clusterChance = 0;
+
       if (Math.random() < clusterChance) {
-        const partner = this.partnerFor(kind, tier);
-        if (partner) {
-          this.pending = partner;
+        let wantHigh = !primary.isHigh; // first partner is the opposite action
+        const p1 = this.pickPartner(tier, wantHigh);
+        if (p1) {
+          this.queue.push(p1);
+          // Sometimes a third (jump-duck-jump) at high difficulty / during surges.
+          const tripleChance = (surging ? 0.6 : 0) + Math.min(0.4, difficulty * 0.25 + endless);
+          if (Math.random() < tripleChance) {
+            wantHigh = !wantHigh;
+            const p2 = this.pickPartner(tier, wantHigh);
+            if (p2) this.queue.push(p2);
+          }
           this.pendingIn = TUNING.clusterGap;
         }
       }
@@ -404,26 +458,34 @@ export class ObstacleSpawner {
     }
   }
 
-  private spawn(tier: number): ObstacleKind {
+  /** Spawn a random unlocked obstacle and return it. */
+  private spawnRandom(tier: number): Obstacle {
     const kinds = (Object.keys(SPECS) as ObstacleKind[]).filter(
       (k) => SPECS[k].minTier <= tier
     );
     const kind = kinds[Math.floor(Math.random() * kinds.length)];
-    this.obstacles.push(new Obstacle(kind, TUNING.width + 80));
-    return kind;
+    return this.spawnKind(kind);
+  }
+
+  private spawnKind(kind: ObstacleKind): Obstacle {
+    const o = new Obstacle(kind, TUNING.width + 80);
+    if (kind === 'flyingHouse' && this.postAth) o.swoop = true;
+    this.obstacles.push(o);
+    return o;
   }
 
   /**
-   * Pick an obstacle from the OPPOSITE action category (air vs ground) so a
-   * cluster forces a quick jump<->duck switch. Only steady-speed kinds qualify
-   * as partners, so a fast charger can't catch and overlap the pair.
+   * Pick a partner of the requested action category (high = duck, low = jump).
+   * Only steady-speed kinds qualify (a fast charger can't overtake the pair),
+   * and downGraph is excluded since its variant is random — keeping the combo's
+   * required actions predictable and therefore fair.
    */
-  private partnerFor(kind: ObstacleKind, tier: number): ObstacleKind | null {
-    const wantHigh = SPECS[kind].clearance === 0; // ground primary -> flying partner
+  private pickPartner(tier: number, wantHigh: boolean): ObstacleKind | null {
     const kinds = (Object.keys(SPECS) as ObstacleKind[]).filter(
       (k) =>
         SPECS[k].minTier <= tier &&
         SPECS[k].extraSpeed === 0 &&
+        k !== 'downGraph' &&
         SPECS[k].clearance > 0 === wantHigh
     );
     if (kinds.length === 0) return null;
@@ -443,12 +505,12 @@ export function drawObstacleIcon(
   y: number,
   scale = 1
 ) {
-  const s = SPECS[kind];
   const o = new Obstacle(kind, 0);
   o.spin = 0; // freeze the animation for a clean still
+  o.duckVariant = false; // downGraph: show the small ground form in menus
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(scale, scale);
-  o.draw(ctx, s.clearance + s.h / 2); // centers the sprite on the local origin
+  o.draw(ctx, o.effClearance + o.effHeight / 2); // center the sprite on the origin
   ctx.restore();
 }

@@ -68,6 +68,8 @@ export class Game {
   private viewingHowTo = false;
   /** Seconds left on a collected rocket's speed boost. */
   private rocketTime = 0;
+  /** Countdown to the next EARNINGS DAY volatility surge. */
+  private surgeTimer: number = TUNING.surgeFirst;
 
   // Leaderboard / name entry
   private board: LeaderboardEntry[] = loadLeaderboard();
@@ -234,6 +236,7 @@ export class Game {
     this.shake = 0;
     this.paused = false;
     this.rocketTime = 0;
+    this.surgeTimer = TUNING.surgeFirst;
     this.highlightIndex = -1;
     this.enteringName = false;
     this.nameEntryEl.classList.remove('visible');
@@ -410,6 +413,21 @@ export class Game {
         this.rocketTime = Math.max(0, this.rocketTime - dt);
         this.hitSlowTime = Math.max(0, this.hitSlowTime - dt);
         this.player.boosting = this.rocketTime > 0;
+
+        // EARNINGS DAY: periodic combo-dense volatility surges.
+        this.surgeTimer -= dt;
+        if (this.surgeTimer <= 0) {
+          this.spawner.startSurge();
+          this.surgeTimer =
+            TUNING.surgeInterval + (Math.random() * 2 - 1) * TUNING.surgeIntervalJitter;
+          this.particles.floatText(
+            TUNING.width / 2,
+            TUNING.height * 0.32,
+            '📊 EARNINGS DAY — VOLATILITY!',
+            '#ffb13d'
+          );
+          this.sound.boostPickup();
+        }
         const scroll = this.scrollSpeed;
 
         this.price.update(dt);
@@ -439,10 +457,7 @@ export class Game {
             p.collected = true;
             const py = this.chart.groundAt(p.x);
             if (p.kind === 'rocket') {
-              this.player.shieldTime = Math.max(
-                this.player.shieldTime,
-                TUNING.pickupShieldTime
-              );
+              // Pure speed burst now — no shield. Faster = riskier.
               this.rocketTime = TUNING.rocketBoostTime;
               this.sound.pickup();
               this.particles.floatText(p.x, py - 90, '🚀 FASTER!', '#ffb13d');

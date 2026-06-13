@@ -130,7 +130,7 @@ export function drawHowTo(ctx: CanvasRenderingContext2D) {
   spriteRow(
     ctx,
     (x, y) => drawPickupIcon(ctx, 'rocket', x, y, 0.9),
-    'ROCKET — speed boost + shield',
+    'ROCKET — speed burst (rare)',
     lx + 16,
     lx + 40,
     392
@@ -142,7 +142,7 @@ export function drawHowTo(ctx: CanvasRenderingContext2D) {
   const ix = rx + 20;
   const tx = rx + 50;
   spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'wreckedHouse', x, y, 0.85), 'CONDEMNED HOUSE — jump', ix, tx, 210);
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'downGraph', x, y, 0.85), 'FALLING CHART — jump', ix, tx, 252);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'downGraph', x, y, 0.85), 'RED CHART — jump it (or duck a tall one!)', ix, tx, 252);
   spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'bear', x, y, 0.85), 'BEAR MARKET — jump', ix, tx, 294);
   spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'paper', x, y, 0.85), 'FUD HEADLINE — duck', ix, tx, 336);
   spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'flyingHouse', x, y, 0.85), 'RIVAL HOUSE — duck', ix, tx, 378);
