@@ -106,6 +106,15 @@ function endingVariant(peak: number) {
   };
 }
 
+/** Share-on-X button on the game-over screen (left column). */
+export const SHARE_BUTTON: ButtonRect = {
+  x: W * 0.27 - 110,
+  y: H * 0.7,
+  w: 220,
+  h: 42,
+  label: '𝕏  SHARE YOUR RUN',
+};
+
 export function drawGameOver(
   ctx: CanvasRenderingContext2D,
   t: number,
@@ -113,7 +122,8 @@ export function drawGameOver(
   timeAlive: number,
   board: LeaderboardEntry[],
   highlightIndex: number,
-  enteringName: boolean
+  enteringName: boolean,
+  global = false
 ) {
   dim(ctx, 0.82);
   const v = endingVariant(peak);
@@ -154,8 +164,23 @@ export function drawGameOver(
   }
   ctx.textAlign = 'left';
 
+  // Share-on-X button (hidden while the name modal is up)
+  if (!enteringName) {
+    const b = SHARE_BUTTON;
+    ctx.fillStyle = 'rgba(20, 32, 50, 0.92)';
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+    ctx.strokeStyle = '#5fa8d8';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(b.x, b.y, b.w, b.h);
+    ctx.font = `bold 16px ${MONO}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#c9d8ea';
+    ctx.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2 + 6);
+    ctx.textAlign = 'left';
+  }
+
   // Right column: leaderboard
-  drawLeaderboard(ctx, board, highlightIndex, W * 0.55, H * 0.14);
+  drawLeaderboard(ctx, board, highlightIndex, W * 0.55, H * 0.14, global);
 
   if (!enteringName && t > 0.8 && Math.floor(t * 1.6) % 2 === 0) {
     centered(ctx, '— TAP OR PRESS ANY KEY TO BUY THE DIP —', H * 0.88, 16, '#f3eee4');
@@ -167,12 +192,13 @@ function drawLeaderboard(
   board: LeaderboardEntry[],
   highlightIndex: number,
   x: number,
-  y: number
+  y: number,
+  global = false
 ) {
   const w = W * 0.38;
   ctx.font = `bold 16px ${MONO}`;
   ctx.fillStyle = '#ffd84d';
-  ctx.fillText('TOP 10 TRADERS', x, y);
+  ctx.fillText(global ? '🌎 GLOBAL TOP 10' : 'TOP 10 TRADERS', x, y);
   ctx.strokeStyle = 'rgba(120, 170, 220, 0.4)';
   ctx.lineWidth = 1;
   ctx.beginPath();

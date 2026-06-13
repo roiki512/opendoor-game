@@ -9,7 +9,8 @@ export const TUNING = {
   // and $40 -> $82 would flash by).
   startPrice: 0.51,
   athPrice: 82, // the historic all-time high — celebrated, then the run goes on
-  baseClimbRate: 0.029, // ln(price) per second at speed x1, no momentum
+  baseClimbRate: 0.045, // ln(price) per second, no momentum (price is NOT sped
+  // up by the milestone multiplier — only by momentum — so it can't run away)
   momentumMaxBonus: 0.5, // up to +50% climb rate on a long clean streak
   momentumFullTime: 18, // seconds without a hit to reach full momentum
   hitPriceDrop: 0.82, // price is multiplied by this on a hit (-18%)
@@ -36,11 +37,17 @@ export const TUNING = {
   maxLives: 3,
 
   // Obstacles
-  spawnIntervalStart: 2.1, // average seconds between obstacles at game start
-  spawnIntervalMin: 0.95, // floor at max difficulty
+  spawnIntervalStart: 1.9, // average seconds between obstacles at game start
+  spawnIntervalMin: 0.78, // floor at max difficulty
   spawnJitter: 0.55, // +/- randomness fraction of the interval
   squeezeDuration: 4.5, // seconds obstacles flee/stop spawning (squeeze effect)
   shieldDuration: 10, // milestone shield: absorbs one hit or expires
+
+  // Cluster combos — at higher difficulty an obstacle sometimes brings a
+  // complementary partner (a jump then a duck, or vice versa) close behind.
+  clusterChanceMax: 0.4, // partner chance at full difficulty
+  clusterGap: 0.62, // seconds between the pair
+  startGrace: 2.4, // calm seconds at the start of a run before the first short
 
   // Collectible pickups
   pickupPriceBoost: 1.06, // Opendoor logo: instant +6% on the price

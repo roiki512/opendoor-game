@@ -10,14 +10,15 @@ export class PriceSystem {
   momentum = 0;
   private streakTime = 0;
 
-  update(dt: number, speedMultiplier: number) {
+  update(dt: number) {
     this.streakTime += dt;
     this.momentum = Math.min(1, this.streakTime / TUNING.momentumFullTime);
 
-    const rate =
-      TUNING.baseClimbRate *
-      speedMultiplier *
-      (1 + this.momentum * TUNING.momentumMaxBonus);
+    // Price climbs at a steady base pace, sped up ONLY by a clean-streak
+    // momentum bonus — deliberately NOT by the milestone speed multiplier, so
+    // the climb can't run away into absurd numbers. Each doubling takes roughly
+    // equal real time; surviving cleanly is what makes you richer.
+    const rate = TUNING.baseClimbRate * (1 + this.momentum * TUNING.momentumMaxBonus);
 
     this.price *= Math.exp(rate * dt);
     if (this.price > this.peak) this.peak = this.price;

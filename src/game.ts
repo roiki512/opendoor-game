@@ -2,7 +2,7 @@ import { TUNING } from './config/tuning';
 import { MILESTONES, type Milestone } from './config/milestones';
 import { Input } from './input';
 import { Sound } from './audio';
-import { PriceSystem } from './systems/price';
+import { PriceSystem, formatPrice } from './systems/price';
 import { Chart } from './systems/background';
 import { Player } from './systems/player';
 import { ObstacleSpawner, boxesOverlap } from './systems/obstacles';
@@ -15,8 +15,18 @@ import {
   drawMilestoneBanner,
   drawPauseMenu,
   PAUSE_BUTTONS,
+  SHARE_BUTTON,
 } from './ui/screens';
-import { loadLeaderboard, qualifies, addEntry, type LeaderboardEntry } from './leaderboard';
+import {
+  loadLeaderboard,
+  qualifies,
+  addEntry,
+  refreshRemote,
+  isGlobal,
+  type LeaderboardEntry,
+} from './leaderboard';
+
+const SHARE_URL = 'https://roiki512.github.io/opendoor-game/';
 
 type State = 'title' | 'playing' | 'gameover';
 
@@ -61,6 +71,11 @@ export class Game {
     this.input = input;
     input.onFirstGesture = () => this.sound.unlock();
     this.player.feetY = this.chart.groundAt(this.player.x);
+
+    // If a global board is configured, pull the standings in the background.
+    void refreshRemote().then(() => {
+      this.board = loadLeaderboard();
+    });
 
     window.addEventListener('keydown', (e) => {
       if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return;
@@ -117,16 +132,37 @@ export class Game {
       }
       return true; // swallow stray taps while the menu is open
     }
+    if (this.state === 'gameover' && !this.enteringName && hit(SHARE_BUTTON)) {
+      this.shareScore();
+      return true; // don't let the tap also restart the run
+    }
     return false;
+  }
+
+  /** Open a pre-filled X/Twitter post bragging about this run's peak. */
+  private shareScore() {
+    const peak = formatPrice(this.price.peak);
+    const text = `I ran $OPEN from $0.51 to ${peak} in "$OPEN: FASTER" 🏠⚡\n\nDodge the shorts, climb to the all-time high — can you beat me?`;
+    const url =
+      'https://twitter.com/intent/tweet?text=' +
+      encodeURIComponent(text) +
+      '&url=' +
+      encodeURIComponent(SHARE_URL);
+    window.open(url, '_blank', 'noopener,noreferrer');
   }
 
   private goToTitle() {
     this.state = 'title';
     this.stateTime = 0;
+    document.body.classList.remove('is-playing');
     this.paused = false;
     this.enteringName = false;
     this.nameEntryEl.classList.remove('visible');
     this.board = loadLeaderboard();
+    // Re-pull the global board (in case others posted, or we just did).
+    void refreshRemote().then(() => {
+      this.board = loadLeaderboard();
+    });
     this.spawner.reset();
     this.pickups.reset();
     this.particles.clear();
@@ -136,6 +172,8 @@ export class Game {
   private startRun() {
     this.state = 'playing';
     this.stateTime = 0;
+    document.body.classList.add('is-playing');
+    this.input.duckButtonHeld = false;
     this.price.reset();
     this.chart = new Chart();
     this.player.reset();
@@ -214,6 +252,8 @@ export class Game {
   private endRun() {
     this.state = 'gameover';
     this.stateTime = 0;
+    document.body.classList.remove('is-playing');
+    this.input.duckButtonHeld = false;
     this.finalTime = this.runTime;
     this.input.clear();
     if (this.price.peak >= TUNING.athPrice) {
@@ -316,7 +356,7 @@ export class Game {
         this.player.boosting = this.rocketTime > 0;
         const scroll = this.scrollSpeed;
 
-        this.price.update(dt, this.speedMultiplier * this.rocketFactor);
+        this.price.update(dt);
         this.checkMilestones();
 
         this.chart.update(dt, scroll);
@@ -324,8 +364,7 @@ export class Game {
         if (this.input.consumeJump() && this.player.tryJump()) this.sound.jump();
         this.player.update(dt, this.chart.groundAt(this.player.x), this.input.duckHeld, scroll);
 
-        const tier = Math.min(this.nextMilestoneIdx, MILESTONES.length);
-        this.spawner.update(dt, scroll, tier, MILESTONES.length);
+        this.spawner.update(dt, scroll, this.nextMilestoneIdx, MILESTONES.length);
         this.pickups.update(dt, scroll);
 
         // Collisions
@@ -428,7 +467,8 @@ export class Game {
         this.finalTime,
         this.board,
         this.highlightIndex,
-        this.enteringName
+        this.enteringName,
+        isGlobal()
       );
     }
 

@@ -50,6 +50,24 @@ input.pointerGuard = (cx, cy) => {
   return game.pointerDown(p.x, p.y);
 };
 
+// On-screen mobile DUCK button: held = duck, released = stand.
+const duckBtn = document.getElementById('duck-btn');
+if (duckBtn) {
+  const press = (e: Event) => {
+    e.preventDefault();
+    input.duckButtonHeld = true;
+  };
+  const release = (e: Event) => {
+    e.preventDefault();
+    input.duckButtonHeld = false;
+  };
+  duckBtn.addEventListener('touchstart', press, { passive: false });
+  duckBtn.addEventListener('touchend', release, { passive: false });
+  duckBtn.addEventListener('touchcancel', release, { passive: false });
+  duckBtn.addEventListener('mousedown', press);
+  window.addEventListener('mouseup', release);
+}
+
 let last = performance.now();
 function frame(now: number) {
   const dt = Math.min((now - last) / 1000, 1 / 30);

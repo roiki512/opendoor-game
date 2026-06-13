@@ -39,6 +39,37 @@
       #rotate-hint {
         display: none;
       }
+      /* On-screen DUCK button — only on touch devices, only mid-run. */
+      #duck-btn {
+        display: none;
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        width: 96px;
+        height: 96px;
+        border-radius: 16px;
+        background: rgba(20, 32, 50, 0.82);
+        border: 2px solid #5fa8d8;
+        color: #c9d8ea;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        font-weight: bold;
+        letter-spacing: 1px;
+        align-items: center;
+        justify-content: center;
+        z-index: 9;
+        user-select: none;
+        -webkit-user-select: none;
+        touch-action: none;
+      }
+      #duck-btn:active {
+        background: rgba(57, 194, 255, 0.35);
+      }
+      @media (hover: none) and (pointer: coarse) {
+        body.is-playing #duck-btn {
+          display: flex;
+        }
+      }
       #name-entry {
         display: none;
         position: fixed;
@@ -121,6 +152,7 @@
   <body>
     <canvas id="game"></canvas>
     <div id="rotate-hint">rotate your phone for the full trading floor 🔄</div>
+    <div id="duck-btn">DUCK ⬇</div>
     <div id="name-entry">
       <h2>★ TOP 10 TRADER ★</h2>
       <p>your peak made the leaderboard — sign it</p>

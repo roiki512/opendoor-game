@@ -21,6 +21,8 @@ export class Input {
   onFirstGesture: (() => void) | null = null;
   /** Returns true if the touch hit a UI element (e.g. mute) and should not jump. */
   pointerGuard: ((clientX: number, clientY: number) => boolean) | null = null;
+  /** Held while the on-screen mobile DUCK button is pressed. */
+  duckButtonHeld = false;
   private gestureSeen = false;
 
   constructor(target: HTMLElement) {
@@ -117,6 +119,7 @@ export class Input {
     return (
       this.keysDown.has('ArrowDown') ||
       this.keysDown.has('KeyS') ||
+      this.duckButtonHeld ||
       (this.touchActive && this.touchDucking)
     );
   }

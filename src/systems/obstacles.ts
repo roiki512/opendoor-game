@@ -5,7 +5,12 @@ import type { Box } from './player';
 //  - 'wreckedHouse' and 'downGraph' sit on the ground -> must JUMP
 //  - 'paper' and 'flyingHouse' fly high -> must DUCK (standing height 46
 //    clips them, duck height 26 clears under their bottom edge at 34px)
-export type ObstacleKind = 'wreckedHouse' | 'downGraph' | 'paper' | 'flyingHouse';
+export type ObstacleKind =
+  | 'wreckedHouse'
+  | 'downGraph'
+  | 'paper'
+  | 'flyingHouse'
+  | 'bear';
 
 interface KindSpec {
   w: number;
@@ -23,6 +28,7 @@ const SPECS: Record<ObstacleKind, KindSpec> = {
   downGraph: { w: 42, h: 22, clearance: 0, extraSpeed: 0, minTier: 0 },
   paper: { w: 40, h: 30, clearance: 34, extraSpeed: 0, minTier: 0 },
   flyingHouse: { w: 44, h: 30, clearance: 34, extraSpeed: 130, minTier: 1 },
+  bear: { w: 44, h: 34, clearance: 0, extraSpeed: 95, minTier: 2 },
 };
 
 export class Obstacle {
@@ -172,6 +178,42 @@ export class Obstacle {
         ctx.fillRect(-b.w / 2 + 4, 9, b.w - 8, 2);
         break;
       }
+      case 'bear': {
+        // A bear-market bear charging in low along the ground — JUMP it.
+        ctx.translate(cx, b.y + b.h); // origin at the bear's feet
+        const w = b.w;
+        const h = b.h;
+        ctx.fillStyle = '#3a2d28'; // dark brown fur
+        // Hunched body + back hump
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.5, 0);
+        ctx.lineTo(-w * 0.5, -h * 0.4);
+        ctx.quadraticCurveTo(-w * 0.5, -h * 0.98, -w * 0.05, -h * 0.92);
+        ctx.quadraticCurveTo(w * 0.4, -h * 0.85, w * 0.42, -h * 0.4);
+        ctx.lineTo(w * 0.42, 0);
+        ctx.closePath();
+        ctx.fill();
+        // Ear
+        ctx.beginPath();
+        ctx.arc(w * 0.12, -h * 0.82, h * 0.12, 0, Math.PI * 2);
+        ctx.fill();
+        // Head
+        ctx.beginPath();
+        ctx.arc(w * 0.34, -h * 0.5, h * 0.28, 0, Math.PI * 2);
+        ctx.fill();
+        // Snout
+        ctx.fillStyle = '#241b17';
+        ctx.fillRect(w * 0.46, -h * 0.52, w * 0.2, h * 0.2);
+        // Angry red eye
+        ctx.fillStyle = '#ff4646';
+        ctx.fillRect(w * 0.32, -h * 0.62, 4, 4);
+        // Legs (mid-stride)
+        const stride = Math.sin(this.spin * 3) * 3;
+        ctx.fillStyle = '#241b17';
+        ctx.fillRect(-w * 0.32 + stride, -h * 0.2, 9, h * 0.2);
+        ctx.fillRect(w * 0.16 - stride, -h * 0.2, 9, h * 0.2);
+        break;
+      }
       case 'flyingHouse': {
         // A rival house airlifted by rotors — flying competition.
         const bob = Math.sin(this.spin) * 3;
@@ -218,21 +260,36 @@ export class Obstacle {
 
 export class ObstacleSpawner {
   obstacles: Obstacle[] = [];
-  private nextSpawnIn = 2.5;
+  private nextSpawnIn: number = TUNING.startGrace;
+  /** First obstacle of a run never clusters — eases new players in. */
+  private firstSpawnDone = false;
+  /** A complementary partner queued behind the last spawn (cluster combo). */
+  private pending: ObstacleKind | null = null;
+  private pendingIn = 0;
   squeezeTime = 0;
 
   reset() {
     this.obstacles = [];
-    this.nextSpawnIn = 2.5;
+    this.nextSpawnIn = TUNING.startGrace;
+    this.firstSpawnDone = false;
+    this.pending = null;
+    this.pendingIn = 0;
     this.squeezeTime = 0;
   }
 
   startSqueeze() {
     this.squeezeTime = TUNING.squeezeDuration;
+    this.pending = null;
+    this.pendingIn = 0;
     for (const o of this.obstacles) o.fleeing = true;
   }
 
-  update(dt: number, scrollSpeed: number, tier: number, totalTiers: number) {
+  /**
+   * @param progress milestones passed so far (uncapped — drives the endless
+   *   difficulty creep past the configured roster).
+   * @param totalTiers number of milestones in the roster.
+   */
+  update(dt: number, scrollSpeed: number, progress: number, totalTiers: number) {
     if (this.squeezeTime > 0) this.squeezeTime -= dt;
 
     for (const o of this.obstacles) o.update(dt, scrollSpeed);
@@ -242,27 +299,76 @@ export class ObstacleSpawner {
 
     if (this.squeezeTime > 0) return; // no spawns during the squeeze
 
+    // Release a queued cluster partner first; hold the main timer until it's out.
+    if (this.pending) {
+      this.pendingIn -= dt;
+      if (this.pendingIn <= 0) {
+        this.obstacles.push(new Obstacle(this.pending, TUNING.width + 80));
+        this.pending = null;
+      }
+      return;
+    }
+
+    const tier = Math.min(progress, totalTiers); // which kinds are unlocked
+    const difficulty = Math.min(1, progress / Math.max(1, totalTiers - 1));
+    // Past the roster, keep creeping difficulty up so endless mode stays tense.
+    const endless = Math.min(0.5, Math.max(0, progress - totalTiers) * 0.04);
+
     this.nextSpawnIn -= dt;
     if (this.nextSpawnIn <= 0) {
-      this.spawn(tier);
+      const kind = this.spawn(tier);
+      const wasFirst = !this.firstSpawnDone;
+      this.firstSpawnDone = true;
+
+      // Maybe bring a complementary partner -> a jump-then-duck (or duck-then-
+      // jump) combo. Chance grows with difficulty and keeps climbing endlessly.
+      // The very first obstacle of a run never clusters.
+      const clusterChance = wasFirst
+        ? 0
+        : Math.min(0.7, TUNING.clusterChanceMax * difficulty + endless);
+      if (Math.random() < clusterChance) {
+        const partner = this.partnerFor(kind, tier);
+        if (partner) {
+          this.pending = partner;
+          this.pendingIn = TUNING.clusterGap;
+        }
+      }
+
       // Interval shrinks as difficulty rises; jitter keeps it unpredictable.
-      const difficulty = Math.min(1, tier / Math.max(1, totalTiers - 1));
       const base =
         TUNING.spawnIntervalStart -
         (TUNING.spawnIntervalStart - TUNING.spawnIntervalMin) * difficulty;
       const jitter = 1 + (Math.random() * 2 - 1) * TUNING.spawnJitter;
       // Normalize by speed a little so high speed doesn't wall you in.
       const speedComp = Math.sqrt(scrollSpeed / TUNING.baseScroll);
-      this.nextSpawnIn = Math.max(0.7, (base * jitter) / speedComp);
+      this.nextSpawnIn = Math.max(0.62 - endless * 0.12, (base * jitter) / speedComp);
     }
   }
 
-  private spawn(tier: number) {
+  private spawn(tier: number): ObstacleKind {
     const kinds = (Object.keys(SPECS) as ObstacleKind[]).filter(
       (k) => SPECS[k].minTier <= tier
     );
     const kind = kinds[Math.floor(Math.random() * kinds.length)];
     this.obstacles.push(new Obstacle(kind, TUNING.width + 80));
+    return kind;
+  }
+
+  /**
+   * Pick an obstacle from the OPPOSITE action category (air vs ground) so a
+   * cluster forces a quick jump<->duck switch. Only steady-speed kinds qualify
+   * as partners, so a fast charger can't catch and overlap the pair.
+   */
+  private partnerFor(kind: ObstacleKind, tier: number): ObstacleKind | null {
+    const wantHigh = SPECS[kind].clearance === 0; // ground primary -> flying partner
+    const kinds = (Object.keys(SPECS) as ObstacleKind[]).filter(
+      (k) =>
+        SPECS[k].minTier <= tier &&
+        SPECS[k].extraSpeed === 0 &&
+        SPECS[k].clearance > 0 === wantHigh
+    );
+    if (kinds.length === 0) return null;
+    return kinds[Math.floor(Math.random() * kinds.length)];
   }
 }
 
