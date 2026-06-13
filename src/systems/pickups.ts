@@ -100,6 +100,24 @@ export class Pickup {
   }
 }
 
+/** Draw a static pickup sprite centered at (x, y) — for menus / how-to-play. */
+export function drawPickupIcon(
+  ctx: CanvasRenderingContext2D,
+  kind: PickupKind,
+  x: number,
+  y: number,
+  scale = 1
+) {
+  const p = new Pickup(0, kind);
+  p.spin = 0;
+  p.altitude = 0;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  p.draw(ctx, 0); // groundY 0 + altitude 0 -> centered on the local origin
+  ctx.restore();
+}
+
 export class PickupSpawner {
   pickups: Pickup[] = [];
   private nextSpawnIn = 5;

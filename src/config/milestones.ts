@@ -36,6 +36,14 @@ export const MILESTONES: Milestone[] = [
     tint: '#37d67a',
   },
   {
+    price: 2,
+    name: 'RABOIS & WU JOIN THE BOARD',
+    tagline: 'Founder firepower returns to the table',
+    boost: 1.16,
+    effect: 'none',
+    tint: '#39c2ff',
+  },
+  {
     price: 4,
     name: 'KAZ',
     tagline: 'A new CEO walks through the open door',

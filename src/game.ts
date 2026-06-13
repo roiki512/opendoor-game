@@ -15,10 +15,12 @@ import {
   drawMilestoneBanner,
   drawPauseMenu,
   drawLeaderboardScreen,
+  drawHowTo,
   PAUSE_BUTTONS,
   SHARE_BUTTON,
-  TITLE_LEADERBOARD_BUTTON,
+  TITLE_BUTTONS,
   BOARD_BACK_BUTTON,
+  HOWTO_BACK_BUTTON,
 } from './ui/screens';
 import {
   loadLeaderboard,
@@ -62,6 +64,8 @@ export class Game {
   private paused = false;
   /** Leaderboard overlay open (from title or pause menu). */
   private viewingBoard = false;
+  /** How-to-play overlay open (from the title menu). */
+  private viewingHowTo = false;
   /** Seconds left on a collected rocket's speed boost. */
   private rocketTime = 0;
 
@@ -84,12 +88,13 @@ export class Game {
 
     window.addEventListener('keydown', (e) => {
       if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return;
-      if (this.viewingBoard) {
+      if (this.viewingBoard || this.viewingHowTo) {
         if (e.code === 'Escape') {
           this.viewingBoard = false;
+          this.viewingHowTo = false;
           this.input.clear();
         }
-        return; // swallow everything else while the board is open
+        return; // swallow everything else while an overlay is open
       }
       if (e.code === 'KeyM') this.sound.toggleMute();
       if ((e.code === 'KeyP' || e.code === 'Escape') && this.state === 'playing') {
@@ -130,14 +135,20 @@ export class Game {
     const hit = (b: { x: number; y: number; w: number; h: number }) =>
       x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
 
-    // The leaderboard overlay sits on top of everything.
+    // Overlays sit on top of everything.
     if (this.viewingBoard) {
       if (hit(BOARD_BACK_BUTTON)) this.viewingBoard = false;
       return true; // swallow all other taps while it's open
     }
-    if (this.state === 'title' && hit(TITLE_LEADERBOARD_BUTTON)) {
-      this.openBoard();
+    if (this.viewingHowTo) {
+      if (hit(HOWTO_BACK_BUTTON)) this.viewingHowTo = false;
       return true;
+    }
+    if (this.state === 'title') {
+      if (hit(TITLE_BUTTONS.start)) this.startRun();
+      else if (hit(TITLE_BUTTONS.howto)) this.viewingHowTo = true;
+      else if (hit(TITLE_BUTTONS.leaderboard)) this.openBoard();
+      return true; // the title is button-driven now
     }
     if (this.state === 'playing' && hit(MUTE_BUTTON)) {
       this.sound.toggleMute();
@@ -187,6 +198,7 @@ export class Game {
     this.state = 'title';
     this.stateTime = 0;
     this.viewingBoard = false;
+    this.viewingHowTo = false;
     document.body.classList.remove('is-playing');
     this.paused = false;
     this.enteringName = false;
@@ -388,8 +400,7 @@ export class Game {
       case 'title':
         this.chart.update(dt, TUNING.baseScroll * 0.4);
         this.player.feetY = this.chart.groundAt(this.player.x);
-        if (this.viewingBoard) this.input.clear();
-        else if (this.input.consumeAction()) this.startRun();
+        this.input.clear(); // the menu is button-driven; no press-any-key start
         break;
 
       case 'playing': {
@@ -505,7 +516,7 @@ export class Game {
       }
       if (this.paused) drawPauseMenu(ctx);
     } else if (this.state === 'title') {
-      drawTitle(ctx, this.stateTime, this.board);
+      drawTitle(ctx);
     } else if (this.state === 'gameover') {
       drawGameOver(
         ctx,
@@ -521,6 +532,9 @@ export class Game {
 
     if (this.viewingBoard) {
       drawLeaderboardScreen(ctx, this.board, isGlobal());
+    }
+    if (this.viewingHowTo) {
+      drawHowTo(ctx);
     }
 
     ctx.restore();

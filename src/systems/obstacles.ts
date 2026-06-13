@@ -179,39 +179,84 @@ export class Obstacle {
         break;
       }
       case 'bear': {
-        // A bear-market bear charging in low along the ground — JUMP it.
-        ctx.translate(cx, b.y + b.h); // origin at the bear's feet
+        // A bear-market grizzly charging LEFT toward the player — JUMP it.
+        ctx.translate(cx, b.y + b.h); // origin at the bear's feet, center
         const w = b.w;
         const h = b.h;
-        ctx.fillStyle = '#3a2d28'; // dark brown fur
-        // Hunched body + back hump
+        const fur = '#5a4636';
+        const dark = '#2e231b';
+        const outline = '#1a130d';
+        const stride = Math.sin(this.spin * 3) * 3;
+
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = outline;
+        ctx.lineWidth = 2;
+
+        // Hind leg (back, right) — drawn first so it sits behind the body
+        ctx.fillStyle = dark;
         ctx.beginPath();
-        ctx.moveTo(-w * 0.5, 0);
-        ctx.lineTo(-w * 0.5, -h * 0.4);
-        ctx.quadraticCurveTo(-w * 0.5, -h * 0.98, -w * 0.05, -h * 0.92);
-        ctx.quadraticCurveTo(w * 0.4, -h * 0.85, w * 0.42, -h * 0.4);
-        ctx.lineTo(w * 0.42, 0);
+        ctx.roundRect(w * 0.24 - stride, -h * 0.34, 11, h * 0.34, 3);
+        ctx.fill();
+        ctx.stroke();
+
+        // Body: bulky torso with a pronounced shoulder hump toward the front
+        ctx.fillStyle = fur;
+        ctx.beginPath();
+        ctx.moveTo(w * 0.46, -h * 0.12); // rump, lower right
+        ctx.quadraticCurveTo(w * 0.56, -h * 0.62, w * 0.18, -h * 0.74); // rump up to back
+        ctx.quadraticCurveTo(-w * 0.06, -h * 0.92, -w * 0.22, -h * 0.66); // shoulder hump (front)
+        ctx.quadraticCurveTo(-w * 0.4, -h * 0.5, -w * 0.34, -h * 0.16); // down the chest (front-left)
+        ctx.quadraticCurveTo(-w * 0.1, -h * 0.04, w * 0.1, -h * 0.06); // belly
+        ctx.quadraticCurveTo(w * 0.34, -h * 0.06, w * 0.46, -h * 0.12);
         ctx.closePath();
         ctx.fill();
-        // Ear
+        ctx.stroke();
+
+        // Head, low and forward (front-left)
+        ctx.fillStyle = fur;
         ctx.beginPath();
-        ctx.arc(w * 0.12, -h * 0.82, h * 0.12, 0, Math.PI * 2);
+        ctx.arc(-w * 0.32, -h * 0.36, h * 0.28, 0, Math.PI * 2);
         ctx.fill();
-        // Head
+        ctx.stroke();
+
+        // Round ear
         ctx.beginPath();
-        ctx.arc(w * 0.34, -h * 0.5, h * 0.28, 0, Math.PI * 2);
+        ctx.arc(-w * 0.2, -h * 0.6, h * 0.11, 0, Math.PI * 2);
         ctx.fill();
-        // Snout
-        ctx.fillStyle = '#241b17';
-        ctx.fillRect(w * 0.46, -h * 0.52, w * 0.2, h * 0.2);
-        // Angry red eye
-        ctx.fillStyle = '#ff4646';
-        ctx.fillRect(w * 0.32, -h * 0.62, 4, 4);
-        // Legs (mid-stride)
-        const stride = Math.sin(this.spin * 3) * 3;
-        ctx.fillStyle = '#241b17';
-        ctx.fillRect(-w * 0.32 + stride, -h * 0.2, 9, h * 0.2);
-        ctx.fillRect(w * 0.16 - stride, -h * 0.2, 9, h * 0.2);
+        ctx.stroke();
+
+        // Muzzle/snout pointing left
+        ctx.fillStyle = dark;
+        ctx.beginPath();
+        ctx.ellipse(-w * 0.5, -h * 0.3, w * 0.13, h * 0.14, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        // Nose tip
+        ctx.fillStyle = '#0b0805';
+        ctx.beginPath();
+        ctx.arc(-w * 0.6, -h * 0.31, 2.4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Angry brow + small red eye beneath it
+        ctx.strokeStyle = '#0b0805';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.46, -h * 0.56);
+        ctx.lineTo(-w * 0.3, -h * 0.48); // angled brow = scowl
+        ctx.stroke();
+        ctx.fillStyle = '#ff5a4d';
+        ctx.beginPath();
+        ctx.arc(-w * 0.4, -h * 0.45, 2.1, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Foreleg (front, left) — drawn last, over the body
+        ctx.fillStyle = '#46362a';
+        ctx.strokeStyle = outline;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(-w * 0.28 + stride, -h * 0.3, 11, h * 0.3, 3);
+        ctx.fill();
+        ctx.stroke();
         break;
       }
       case 'flyingHouse': {
@@ -374,4 +419,22 @@ export class ObstacleSpawner {
 
 export function boxesOverlap(a: Box, b: Box): boolean {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+/** Draw a static obstacle sprite centered at (x, y) — for menus / how-to-play. */
+export function drawObstacleIcon(
+  ctx: CanvasRenderingContext2D,
+  kind: ObstacleKind,
+  x: number,
+  y: number,
+  scale = 1
+) {
+  const s = SPECS[kind];
+  const o = new Obstacle(kind, 0);
+  o.spin = 0; // freeze the animation for a clean still
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  o.draw(ctx, s.clearance + s.h / 2); // centers the sprite on the local origin
+  ctx.restore();
 }

@@ -1,5 +1,7 @@
 import { TUNING } from '../config/tuning';
 import { formatPrice } from '../systems/price';
+import { drawObstacleIcon } from '../systems/obstacles';
+import { drawPickupIcon } from '../systems/pickups';
 import type { Milestone } from '../config/milestones';
 import type { LeaderboardEntry } from '../leaderboard';
 
@@ -33,47 +35,121 @@ function centered(
   ctx.textAlign = 'left';
 }
 
-export function drawTitle(
+/** Title is a real menu now: START GAME / HOW TO PLAY / LEADERBOARD. */
+export const TITLE_BUTTONS: Record<'start' | 'howto' | 'leaderboard', ButtonRect> = {
+  start: { x: W / 2 - 120, y: H * 0.5, w: 240, h: 48, label: '▶  START GAME' },
+  howto: { x: W / 2 - 120, y: H * 0.63, w: 240, h: 44, label: 'HOW TO PLAY' },
+  leaderboard: { x: W / 2 - 120, y: H * 0.75, w: 240, h: 44, label: '🏆 LEADERBOARD' },
+};
+
+export function drawTitle(ctx: CanvasRenderingContext2D) {
+  dim(ctx, 0.5);
+  centered(ctx, '$OPEN', H * 0.26, 66, '#37d67a', true);
+  centered(ctx, 'F A S T E R', H * 0.385, 34, '#ffd84d', true);
+  drawButton(ctx, TITLE_BUTTONS.start, 19);
+  drawButton(ctx, TITLE_BUTTONS.howto, 16);
+  drawButton(ctx, TITLE_BUTTONS.leaderboard, 16);
+}
+
+// ---- How to play overlay ----
+
+export const HOWTO_BACK_BUTTON: ButtonRect = {
+  x: W / 2 - 90,
+  y: H * 0.88,
+  w: 180,
+  h: 38,
+  label: '‹ BACK',
+};
+
+function sectionHead(ctx: CanvasRenderingContext2D, text: string, x: number, y: number) {
+  ctx.font = `bold 15px ${MONO}`;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffd84d';
+  ctx.fillText(text, x, y);
+}
+
+function infoLine(ctx: CanvasRenderingContext2D, text: string, x: number, y: number) {
+  ctx.font = `13px ${MONO}`;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#dce8f4';
+  ctx.fillText(text, x, y);
+}
+
+/** A sprite icon with a label to its right. */
+function spriteRow(
   ctx: CanvasRenderingContext2D,
-  t: number,
-  board: LeaderboardEntry[]
+  drawIcon: (x: number, y: number) => void,
+  label: string,
+  iconX: number,
+  textX: number,
+  y: number
 ) {
-  dim(ctx, 0.45);
-  centered(ctx, '$OPEN', H * 0.24, 64, '#37d67a', true);
-  centered(ctx, 'F A S T E R', H * 0.36, 34, '#ffd84d', true);
+  drawIcon(iconX, y);
+  infoLine(ctx, label, textX, y + 4);
+}
+
+export function drawHowTo(ctx: CanvasRenderingContext2D) {
+  dim(ctx, 0.93);
+  centered(ctx, 'HOW TO PLAY', H * 0.1, 30, '#ffd84d', true);
   centered(
     ctx,
-    'From $0.51 rock bottom to $82 and beyond — how FAST can you go?',
-    H * 0.48,
-    15,
-    '#c9d8ea'
+    "You're the $OPEN share price. Run up the chart from the $0.51 all-time low",
+    H * 0.18,
+    13,
+    '#c9d8ea',
+    false,
+    ''
   );
   centered(
     ctx,
-    'SPACE / TAP = jump      ↓ / SWIPE DOWN = duck',
-    H * 0.56,
-    14,
-    'rgba(150, 190, 230, 0.85)',
+    'to $82 and far beyond — grab power-ups, dodge the short sellers, climb FASTER.',
+    H * 0.225,
+    13,
+    '#c9d8ea',
     false,
     ''
   );
 
-  if (board.length > 0) {
-    const top = board[0];
-    centered(
-      ctx,
-      `👑 RECORD: ${top.name} — ${formatPrice(top.score)}`,
-      H * 0.65,
-      14,
-      '#ffd84d'
-    );
-  }
+  // Left column: controls + power-ups
+  const lx = 70;
+  sectionHead(ctx, 'CONTROLS', lx, 175);
+  infoLine(ctx, 'JUMP   Space / ↑ / W  •  tap', lx, 202);
+  infoLine(ctx, 'DUCK   ↓ / S  •  hold', lx, 226);
+  infoLine(ctx, 'On phone: on-screen JUMP / DUCK buttons', lx, 250);
+  infoLine(ctx, 'Pause   Esc / P', lx, 274);
 
-  drawButton(ctx, TITLE_LEADERBOARD_BUTTON, 15);
+  sectionHead(ctx, 'POWER-UPS', lx, 318);
+  spriteRow(
+    ctx,
+    (x, y) => drawPickupIcon(ctx, 'logo', x, y, 0.9),
+    'OPENDOOR LOGO — instant price bump',
+    lx + 16,
+    lx + 40,
+    350
+  );
+  spriteRow(
+    ctx,
+    (x, y) => drawPickupIcon(ctx, 'rocket', x, y, 0.9),
+    'ROCKET — speed boost + shield',
+    lx + 16,
+    lx + 40,
+    392
+  );
 
-  if (Math.floor(t * 1.6) % 2 === 0) {
-    centered(ctx, '— PRESS ANY KEY OR TAP TO IPO —', H * 0.84, 16, '#f3eee4');
-  }
+  // Right column: the shorts' obstacles
+  const rx = 520;
+  sectionHead(ctx, 'DODGE THE SHORTS', rx, 175);
+  const ix = rx + 20;
+  const tx = rx + 50;
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'wreckedHouse', x, y, 0.85), 'CONDEMNED HOUSE — jump', ix, tx, 210);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'downGraph', x, y, 0.85), 'FALLING CHART — jump', ix, tx, 252);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'bear', x, y, 0.85), 'BEAR MARKET — jump', ix, tx, 294);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'paper', x, y, 0.85), 'FUD HEADLINE — duck', ix, tx, 336);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'flyingHouse', x, y, 0.85), 'RIVAL HOUSE — duck', ix, tx, 378);
+
+  drawButton(ctx, HOWTO_BACK_BUTTON);
+  centered(ctx, '(ESC to close)', H * 0.95, 12, 'rgba(150, 190, 230, 0.7)', false, '');
+  ctx.textAlign = 'left';
 }
 
 // The ending depends on how far you got. Three tiers of glory.
@@ -273,14 +349,6 @@ export function drawPauseMenu(ctx: CanvasRenderingContext2D) {
 }
 
 // ---- Leaderboard overlay (opened from the title or pause menu) ----
-
-export const TITLE_LEADERBOARD_BUTTON: ButtonRect = {
-  x: W / 2 - 100,
-  y: H * 0.71,
-  w: 200,
-  h: 38,
-  label: '🏆 LEADERBOARD',
-};
 
 export const BOARD_BACK_BUTTON: ButtonRect = {
   x: W / 2 - 90,
