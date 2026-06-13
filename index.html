@@ -39,11 +39,11 @@
       #rotate-hint {
         display: none;
       }
-      /* On-screen DUCK button — only on touch devices, only mid-run. */
+      /* On-screen JUMP / DUCK buttons — only on touch devices, only mid-run. */
+      #jump-btn,
       #duck-btn {
         display: none;
         position: fixed;
-        right: 18px;
         bottom: 18px;
         width: 96px;
         height: 96px;
@@ -62,10 +62,14 @@
         -webkit-user-select: none;
         touch-action: none;
       }
+      #jump-btn { left: 18px; }
+      #duck-btn { right: 18px; }
+      #jump-btn:active,
       #duck-btn:active {
         background: rgba(57, 194, 255, 0.35);
       }
       @media (hover: none) and (pointer: coarse) {
+        body.is-playing #jump-btn,
         body.is-playing #duck-btn {
           display: flex;
         }
@@ -152,6 +156,7 @@
   <body>
     <canvas id="game"></canvas>
     <div id="rotate-hint">rotate your phone for the full trading floor 🔄</div>
+    <div id="jump-btn">JUMP ⬆</div>
     <div id="duck-btn">DUCK ⬇</div>
     <div id="name-entry">
       <h2>★ TOP 10 TRADER ★</h2>

@@ -101,6 +101,13 @@ export class Input {
     }
   }
 
+  /** Fire a jump from the on-screen mobile JUMP button. */
+  pressJump() {
+    this.firstGesture();
+    this.jumpQueued = true;
+    this.actionQueued = true; // also works as "start / restart" on menu screens
+  }
+
   /** Edge-triggered jump; returns true once per press. */
   consumeJump(): boolean {
     const j = this.jumpQueued;

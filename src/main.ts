@@ -50,6 +50,17 @@ input.pointerGuard = (cx, cy) => {
   return game.pointerDown(p.x, p.y);
 };
 
+// On-screen mobile JUMP button: each press fires one jump.
+const jumpBtn = document.getElementById('jump-btn');
+if (jumpBtn) {
+  const jump = (e: Event) => {
+    e.preventDefault();
+    input.pressJump();
+  };
+  jumpBtn.addEventListener('touchstart', jump, { passive: false });
+  jumpBtn.addEventListener('mousedown', jump);
+}
+
 // On-screen mobile DUCK button: held = duck, released = stand.
 const duckBtn = document.getElementById('duck-btn');
 if (duckBtn) {
