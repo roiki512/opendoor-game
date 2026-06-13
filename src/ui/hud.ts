@@ -91,19 +91,21 @@ export function drawHud(ctx: CanvasRenderingContext2D, s: HudState) {
     ctx.globalAlpha = 1;
   }
 
-  // ---- Speed meter (bottom-left, above ticker) ----
+  // ---- Speed meter (bottom-center, above ticker — clear of the on-screen
+  //      JUMP/DUCK buttons that sit in the bottom corners on touch devices) ----
+  const cx = W / 2;
+  const barW = 150;
   const speedText = `FASTER ×${s.speedMultiplier.toFixed(2)}`;
+  ctx.textAlign = 'center';
   ctx.font = `bold 16px ${MONO}`;
   ctx.fillStyle = '#ffb13d';
-  ctx.fillText(speedText, 16, TUNING.height - 38);
+  ctx.fillText(speedText, cx, TUNING.height - 44);
   // Momentum bar
   ctx.fillStyle = 'rgba(40, 60, 90, 0.6)';
-  ctx.fillRect(16, TUNING.height - 56, 120, 6);
+  ctx.fillRect(cx - barW / 2, TUNING.height - 36, barW, 6);
   ctx.fillStyle = '#39c2ff';
-  ctx.fillRect(16, TUNING.height - 56, 120 * s.momentum, 6);
-  ctx.font = `9px ${MONO}`;
-  ctx.fillStyle = 'rgba(150, 190, 230, 0.7)';
-  ctx.fillText('MOMENTUM', 142, TUNING.height - 51);
+  ctx.fillRect(cx - barW / 2, TUNING.height - 36, barW * s.momentum, 6);
+  ctx.textAlign = 'left';
 
   // ---- Mute button ----
   drawMuteButton(ctx, s.muted);
