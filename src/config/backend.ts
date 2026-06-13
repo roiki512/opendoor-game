@@ -26,8 +26,8 @@
 //  designed for; row-level security controls what it can do.
 // ============================================================
 
-export const SUPABASE_URL = 'https://ttjqeqqyfavogvuxdxuj.supabase.co';
-export const SUPABASE_ANON_KEY =
+export const SUPABASE_URL: string = 'https://ttjqeqqyfavogvuxdxuj.supabase.co';
+export const SUPABASE_ANON_KEY: string =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR0anFlcXF5ZmF2b2d2dXhkeHVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMDc1ODYsImV4cCI6MjA5Njg4MzU4Nn0.BKQ_QZtWybhBM5pu2vWTGOuEIlmlGd8L3HFqvGkGD2I';
 
 /** Global board is active only when both values above are filled in. */
