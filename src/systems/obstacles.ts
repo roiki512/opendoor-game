@@ -37,21 +37,26 @@ const SPECS: Record<ObstacleKind, KindSpec> = {
   bear: { w: 44, h: 34, clearance: 0, extraSpeed: 55, minTier: 2 },
 };
 
-// Tall "crash wall" form of downGraph: its top sits above the jump apex (~112px)
-// so it CANNOT be jumped — you must duck under it.
-const DOWNGRAPH_HIGH = { clearance: 34, h: 96 };
-// Post-$82, rival houses swoop upward and back down as they travel (px).
-const FLYINGHOUSE_SWOOP = 18;
+// downGraph is a "crashing chart": it descends from above as it crosses and
+// settles into one of two resting places by the time it reaches the player —
+//  - JUMP form: a small chart that lands ON the ground (jump over it)
+//  - DUCK form: a tall wall that stops at head height; its top sits above the
+//    jump apex (~112px) so it CANNOT be jumped — you must duck under it.
+const DG_JUMP = { h: 30, startClear: 64, targetClear: 0 };
+const DG_DUCK = { h: 88, startClear: 150, targetClear: 32 };
+const PLAYER_X = TUNING.width * TUNING.playerX;
+const SPAWN_X = TUNING.width + 80;
+// Rival houses swoop up and down the whole time they travel (px amplitude).
+// Kept so the gap underneath stays duckable at the low point (never a jump).
+const FLYINGHOUSE_SWOOP = 10;
 
 export class Obstacle {
   x: number;
   kind: ObstacleKind;
   spin = Math.random() * Math.PI * 2;
   fleeing = false;
-  /** downGraph only: true = tall hanging wall (DUCK), false = ground (JUMP). */
+  /** downGraph only: true = descends to a tall DUCK wall, false = ground JUMP. */
   duckVariant = false;
-  /** flyingHouse only: post-$82 vertical swoop. */
-  swoop = false;
 
   constructor(kind: ObstacleKind, x: number) {
     this.kind = kind;
@@ -63,18 +68,29 @@ export class Obstacle {
     return SPECS[this.kind];
   }
 
-  /** Bottom-edge clearance, accounting for the downGraph variant. */
+  /** 0 at spawn → 1 by the time the obstacle reaches the player's x. */
+  private get approach(): number {
+    const p = (SPAWN_X - this.x) / (SPAWN_X - PLAYER_X);
+    return Math.min(1, Math.max(0, p));
+  }
+
+  /** Bottom-edge clearance. For downGraph this eases as the chart descends. */
   get effClearance(): number {
-    if (this.kind === 'downGraph') return this.duckVariant ? DOWNGRAPH_HIGH.clearance : 0;
+    if (this.kind === 'downGraph') {
+      const v = this.duckVariant ? DG_DUCK : DG_JUMP;
+      const e = 1 - (1 - this.approach) * (1 - this.approach); // easeOutQuad
+      return v.startClear + (v.targetClear - v.startClear) * e;
+    }
     return SPECS[this.kind].clearance;
   }
   get effHeight(): number {
-    if (this.kind === 'downGraph' && this.duckVariant) return DOWNGRAPH_HIGH.h;
+    if (this.kind === 'downGraph') return this.duckVariant ? DG_DUCK.h : DG_JUMP.h;
     return SPECS[this.kind].h;
   }
   /** A "high" obstacle must be ducked under (vs. a ground one you jump over). */
   get isHigh(): boolean {
-    return this.effClearance > 0;
+    if (this.kind === 'downGraph') return this.duckVariant;
+    return SPECS[this.kind].clearance > 0;
   }
 
   update(dt: number, scrollSpeed: number) {
@@ -89,9 +105,7 @@ export class Obstacle {
     const h = this.effHeight;
     let bob = 0;
     if (this.kind === 'flyingHouse') {
-      bob = this.swoop
-        ? -(Math.sin(this.x * 0.012) * 0.5 + 0.5) * FLYINGHOUSE_SWOOP // swoop up & back
-        : Math.sin(this.spin) * 3;
+      bob = Math.sin(this.x * 0.012) * FLYINGHOUSE_SWOOP; // continuous up/down swoop
     }
     return {
       x: this.x - w / 2,
@@ -355,8 +369,6 @@ export class ObstacleSpawner {
   /** Partners queued behind the last spawn (cluster / triple combo). */
   private queue: ObstacleKind[] = [];
   private pendingIn = 0;
-  /** True once past the configured roster ($82) — unlocks swooping rivals. */
-  private postAth = false;
   squeezeTime = 0;
   /** EARNINGS DAY volatility burst — combo-heavy while it lasts. */
   surgeTime = 0;
@@ -367,7 +379,6 @@ export class ObstacleSpawner {
     this.firstSpawnDone = false;
     this.queue = [];
     this.pendingIn = 0;
-    this.postAth = false;
     this.squeezeTime = 0;
     this.surgeTime = 0;
   }
@@ -392,7 +403,6 @@ export class ObstacleSpawner {
   update(dt: number, scrollSpeed: number, progress: number, totalTiers: number) {
     if (this.squeezeTime > 0) this.squeezeTime -= dt;
     if (this.surgeTime > 0) this.surgeTime -= dt;
-    this.postAth = progress >= totalTiers;
 
     for (const o of this.obstacles) o.update(dt, scrollSpeed);
     this.obstacles = this.obstacles.filter(
@@ -412,7 +422,9 @@ export class ObstacleSpawner {
     }
 
     const tier = Math.min(progress, totalTiers); // which kinds are unlocked
-    const difficulty = Math.min(1, progress / Math.max(1, totalTiers - 1));
+    // Ramp to full difficulty by ~60% of the roster, so the climb to $82 is a
+    // real test rather than only heating up at the very end.
+    const difficulty = Math.min(1, progress / Math.max(1, (totalTiers - 1) * 0.6));
     // Past the roster, keep creeping difficulty up so endless mode stays tense.
     const endless = Math.min(0.5, Math.max(0, progress - totalTiers) * 0.04);
     const surging = this.surgeTime > 0;
@@ -469,7 +481,6 @@ export class ObstacleSpawner {
 
   private spawnKind(kind: ObstacleKind): Obstacle {
     const o = new Obstacle(kind, TUNING.width + 80);
-    if (kind === 'flyingHouse' && this.postAth) o.swoop = true;
     this.obstacles.push(o);
     return o;
   }
