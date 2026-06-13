@@ -1,5 +1,5 @@
 import { TUNING } from './config/tuning';
-import { MILESTONES, type Milestone } from './config/milestones';
+import { MILESTONES, POST_ATH_MILESTONES, type Milestone } from './config/milestones';
 import { Input } from './input';
 import { Sound } from './audio';
 import { PriceSystem, formatPrice } from './systems/price';
@@ -14,8 +14,11 @@ import {
   drawGameOver,
   drawMilestoneBanner,
   drawPauseMenu,
+  drawLeaderboardScreen,
   PAUSE_BUTTONS,
   SHARE_BUTTON,
+  TITLE_LEADERBOARD_BUTTON,
+  BOARD_BACK_BUTTON,
 } from './ui/screens';
 import {
   loadLeaderboard,
@@ -47,8 +50,8 @@ export class Game {
 
   private lives = TUNING.maxLives;
   private speedMultiplier = 1;
-  /** Boosts earned from milestones — each hit knocks the latest one off. */
-  private boostStack: number[] = [];
+  /** Seconds left on the temporary slowdown from the last hit. */
+  private hitSlowTime = 0;
   private nextMilestoneIdx = 0;
   private runTime = 0;
   private finalTime = 0;
@@ -57,6 +60,8 @@ export class Game {
   private tintStrength = 0;
   private shake = 0;
   private paused = false;
+  /** Leaderboard overlay open (from title or pause menu). */
+  private viewingBoard = false;
   /** Seconds left on a collected rocket's speed boost. */
   private rocketTime = 0;
 
@@ -79,6 +84,13 @@ export class Game {
 
     window.addEventListener('keydown', (e) => {
       if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return;
+      if (this.viewingBoard) {
+        if (e.code === 'Escape') {
+          this.viewingBoard = false;
+          this.input.clear();
+        }
+        return; // swallow everything else while the board is open
+      }
       if (e.code === 'KeyM') this.sound.toggleMute();
       if ((e.code === 'KeyP' || e.code === 'Escape') && this.state === 'playing') {
         this.paused = !this.paused;
@@ -118,6 +130,15 @@ export class Game {
     const hit = (b: { x: number; y: number; w: number; h: number }) =>
       x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
 
+    // The leaderboard overlay sits on top of everything.
+    if (this.viewingBoard) {
+      if (hit(BOARD_BACK_BUTTON)) this.viewingBoard = false;
+      return true; // swallow all other taps while it's open
+    }
+    if (this.state === 'title' && hit(TITLE_LEADERBOARD_BUTTON)) {
+      this.openBoard();
+      return true;
+    }
     if (this.state === 'playing' && hit(MUTE_BUTTON)) {
       this.sound.toggleMute();
       return true;
@@ -127,6 +148,8 @@ export class Game {
         this.paused = false;
       } else if (hit(PAUSE_BUTTONS.restart)) {
         this.startRun();
+      } else if (hit(PAUSE_BUTTONS.leaderboard)) {
+        this.openBoard();
       } else if (hit(PAUSE_BUTTONS.menu)) {
         this.goToTitle();
       }
@@ -151,9 +174,19 @@ export class Game {
     window.open(url, '_blank', 'noopener,noreferrer');
   }
 
+  /** Open the leaderboard overlay and pull the freshest standings. */
+  private openBoard() {
+    this.viewingBoard = true;
+    this.input.clear();
+    void refreshRemote().then(() => {
+      this.board = loadLeaderboard();
+    });
+  }
+
   private goToTitle() {
     this.state = 'title';
     this.stateTime = 0;
+    this.viewingBoard = false;
     document.body.classList.remove('is-playing');
     this.paused = false;
     this.enteringName = false;
@@ -183,7 +216,7 @@ export class Game {
     this.particles.clear();
     this.lives = TUNING.maxLives;
     this.speedMultiplier = 1;
-    this.boostStack = [];
+    this.hitSlowTime = 0;
     this.nextMilestoneIdx = 0;
     this.runTime = 0;
     this.banner = null;
@@ -202,12 +235,22 @@ export class Game {
     return this.rocketTime > 0 ? TUNING.rocketBoostMult : 1;
   }
 
+  /**
+   * Temporary slowdown after a hit that eases back to full. 1 = no penalty,
+   * dips to hitSlowMult right after a hit and recovers over hitSlowRecover.
+   */
+  private get hitSlowFactor(): number {
+    if (this.hitSlowTime <= 0) return 1;
+    const p = this.hitSlowTime / TUNING.hitSlowRecover; // 1 just after hit -> 0
+    return TUNING.hitSlowMult + (1 - TUNING.hitSlowMult) * (1 - p);
+  }
+
   private get scrollSpeed(): number {
     let s =
       TUNING.baseScroll *
       Math.pow(this.speedMultiplier, TUNING.scrollExponent) *
-      this.rocketFactor;
-    if (this.chart.crashing) s *= 0.8; // brief slowdown while the floor is down
+      this.rocketFactor *
+      this.hitSlowFactor;
     return Math.min(TUNING.maxScroll, s);
   }
 
@@ -223,17 +266,15 @@ export class Game {
 
     this.lives--;
     const lost = this.price.hit();
-    // Each hit also knocks off the most recent speed boost.
-    const lostBoost = this.boostStack.pop();
-    if (lostBoost) {
-      this.speedMultiplier /= lostBoost;
-      this.particles.floatText(
-        this.player.x - 30,
-        this.player.feetY - 115,
-        'BOOST LOST!',
-        '#ffb13d'
-      );
-    }
+    // A hit briefly slows the game; it eases back to full speed afterward
+    // (the boosts you've earned are kept — only the pace dips temporarily).
+    this.hitSlowTime = TUNING.hitSlowRecover;
+    this.particles.floatText(
+      this.player.x - 30,
+      this.player.feetY - 115,
+      'SLOWED!',
+      '#ffb13d'
+    );
     this.chart.onHit();
     this.player.invincibleTime = TUNING.invincibleTime;
     this.particles.crashBurst(this.player.x, this.player.feetY - 20);
@@ -286,11 +327,16 @@ export class Game {
     this.goToTitle();
   }
 
-  /** Past the configured roster, every doubling is a fresh all-time high. */
+  /**
+   * Past the configured roster, every doubling is a new milestone — themed ones
+   * from POST_ATH_MILESTONES while they last, then a generic all-time high.
+   */
   private milestoneAt(idx: number): Milestone {
     if (idx < MILESTONES.length) return MILESTONES[idx];
     const doublings = idx - MILESTONES.length + 1;
     const price = Math.round(TUNING.athPrice * Math.pow(2, doublings));
+    const themed = POST_ATH_MILESTONES[idx - MILESTONES.length];
+    if (themed) return { ...themed, price };
     return {
       price,
       name: 'NEW ALL-TIME HIGH',
@@ -307,7 +353,6 @@ export class Game {
       this.nextMilestoneIdx++;
 
       this.speedMultiplier *= m.boost;
-      if (m.boost > 1) this.boostStack.push(m.boost);
       this.tint = m.tint;
       this.tintStrength = 1;
       this.banner = { milestone: m, t: 0 };
@@ -343,7 +388,8 @@ export class Game {
       case 'title':
         this.chart.update(dt, TUNING.baseScroll * 0.4);
         this.player.feetY = this.chart.groundAt(this.player.x);
-        if (this.input.consumeAction()) this.startRun();
+        if (this.viewingBoard) this.input.clear();
+        else if (this.input.consumeAction()) this.startRun();
         break;
 
       case 'playing': {
@@ -353,6 +399,7 @@ export class Game {
         }
         this.runTime += dt;
         this.rocketTime = Math.max(0, this.rocketTime - dt);
+        this.hitSlowTime = Math.max(0, this.hitSlowTime - dt);
         this.player.boosting = this.rocketTime > 0;
         const scroll = this.scrollSpeed;
 
@@ -447,7 +494,7 @@ export class Game {
         price: this.price.price,
         peak: this.price.peak,
         lives: this.lives,
-        speedMultiplier: this.speedMultiplier * this.rocketFactor,
+        speedMultiplier: this.speedMultiplier * this.rocketFactor * this.hitSlowFactor,
         momentum: this.price.momentum,
         nextMilestone: this.milestoneAt(this.nextMilestoneIdx),
         muted: this.sound.muted,
@@ -470,6 +517,10 @@ export class Game {
         this.enteringName,
         isGlobal()
       );
+    }
+
+    if (this.viewingBoard) {
+      drawLeaderboardScreen(ctx, this.board, isGlobal());
     }
 
     ctx.restore();

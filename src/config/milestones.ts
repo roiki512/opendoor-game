@@ -93,6 +93,83 @@ export const MILESTONES: Milestone[] = [
   },
 ];
 
+// Past $82 the climb is endless. Instead of a generic "NEW ALL-TIME HIGH" at
+// every doubling, these themed milestones fire in order (price is filled in
+// automatically from the doubling). After the list is exhausted it falls back
+// to a generic all-time-high banner. Edit/extend freely.
+export const POST_ATH_MILESTONES: Omit<Milestone, 'price'>[] = [
+  {
+    name: 'INTERNATIONAL EXPANSION',
+    tagline: 'Open doors across the Atlantic 🌍',
+    boost: 1.1,
+    effect: 'shield',
+    tint: '#39c2ff',
+  },
+  {
+    name: 'OPENDOOR CARD LAUNCHES',
+    tagline: 'Swipe right on your next home',
+    boost: 1.08,
+    effect: 'none',
+    tint: '#37d67a',
+  },
+  {
+    name: '$100B MARKET CAP',
+    tagline: 'Eleven zeros and climbing',
+    boost: 1.09,
+    effect: 'none',
+    tint: '#ffd84d',
+  },
+  {
+    name: 'MORTGAGE IN 60 SECONDS',
+    tagline: 'Approved before the kettle boils',
+    boost: 1.08,
+    effect: 'shield',
+    tint: '#39c2ff',
+  },
+  {
+    name: 'SHORTS FULLY LIQUIDATED',
+    tagline: 'The last bear leaves the building',
+    boost: 1.1,
+    effect: 'squeeze',
+    tint: '#ffb13d',
+  },
+  {
+    name: '$1 TRILLION MARKET CAP',
+    tagline: 'Welcome to the four-comma club',
+    boost: 1.1,
+    effect: 'ath',
+    tint: '#ffd84d',
+  },
+  {
+    name: 'OPENDOOR ON EVERY CONTINENT',
+    tagline: 'Even the penguins got a cash offer',
+    boost: 1.08,
+    effect: 'none',
+    tint: '#37d67a',
+  },
+  {
+    name: 'THE HOUSING SINGULARITY',
+    tagline: 'Homes now buy and sell themselves',
+    boost: 1.09,
+    effect: 'shield',
+    tint: '#7a6bff',
+  },
+  {
+    name: 'OPENDOOR BUYS THE MOON',
+    tagline: 'Lunar listings, instant offers 🌕',
+    boost: 1.1,
+    effect: 'squeeze',
+    tint: '#ffd84d',
+  },
+  {
+    name: 'INTERSTELLAR REAL ESTATE',
+    tagline: 'To infinity — and beyond the all-time high',
+    boost: 1.1,
+    effect: 'ath',
+    tint: '#ffd84d',
+  },
+];
+
 // Headlines for the scrolling ticker tape at the bottom of the screen.
 export const TICKER_HEADLINES = [
   '$OPEN +12% — shorts reportedly "very tired"',

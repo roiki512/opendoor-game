@@ -63,14 +63,16 @@ export function drawTitle(
     centered(
       ctx,
       `👑 RECORD: ${top.name} — ${formatPrice(top.score)}`,
-      H * 0.66,
+      H * 0.65,
       14,
       '#ffd84d'
     );
   }
 
+  drawButton(ctx, TITLE_LEADERBOARD_BUTTON, 15);
+
   if (Math.floor(t * 1.6) % 2 === 0) {
-    centered(ctx, '— PRESS ANY KEY OR TAP TO IPO —', H * 0.8, 16, '#f3eee4');
+    centered(ctx, '— PRESS ANY KEY OR TAP TO IPO —', H * 0.84, 16, '#f3eee4');
   }
 }
 
@@ -239,30 +241,66 @@ export interface ButtonRect {
   label: string;
 }
 
-export const PAUSE_BUTTONS: Record<'resume' | 'restart' | 'menu', ButtonRect> = {
-  resume: { x: W / 2 - 115, y: 228, w: 230, h: 46, label: 'CONTINUE' },
-  restart: { x: W / 2 - 115, y: 288, w: 230, h: 46, label: 'RESTART RUN' },
-  menu: { x: W / 2 - 115, y: 348, w: 230, h: 46, label: 'MAIN MENU' },
+export const PAUSE_BUTTONS: Record<
+  'resume' | 'restart' | 'leaderboard' | 'menu',
+  ButtonRect
+> = {
+  resume: { x: W / 2 - 115, y: 198, w: 230, h: 44, label: 'CONTINUE' },
+  restart: { x: W / 2 - 115, y: 250, w: 230, h: 44, label: 'RESTART RUN' },
+  leaderboard: { x: W / 2 - 115, y: 302, w: 230, h: 44, label: '🏆 LEADERBOARD' },
+  menu: { x: W / 2 - 115, y: 354, w: 230, h: 44, label: 'MAIN MENU' },
 };
+
+/** Shared button look used by the pause/title/board menus. */
+function drawButton(ctx: CanvasRenderingContext2D, b: ButtonRect, size = 17) {
+  ctx.fillStyle = 'rgba(16, 26, 42, 0.92)';
+  ctx.fillRect(b.x, b.y, b.w, b.h);
+  ctx.strokeStyle = '#5fa8d8';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(b.x, b.y, b.w, b.h);
+  ctx.font = `bold ${size}px ${MONO}`;
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#c9d8ea';
+  ctx.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2 + 6);
+  ctx.textAlign = 'left';
+}
 
 export function drawPauseMenu(ctx: CanvasRenderingContext2D) {
   dim(ctx, 0.72);
-  centered(ctx, 'TRADING HALTED', 175, 36, '#f3eee4', true);
+  centered(ctx, 'TRADING HALTED', 165, 34, '#f3eee4', true);
+  for (const b of Object.values(PAUSE_BUTTONS)) drawButton(ctx, b);
+  centered(ctx, '(ESC or P to resume)', 426, 12, 'rgba(150, 190, 230, 0.7)', false, '');
+}
 
-  for (const b of Object.values(PAUSE_BUTTONS)) {
-    ctx.fillStyle = 'rgba(16, 26, 42, 0.92)';
-    ctx.fillRect(b.x, b.y, b.w, b.h);
-    ctx.strokeStyle = '#5fa8d8';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(b.x, b.y, b.w, b.h);
-    ctx.font = `bold 17px ${MONO}`;
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#c9d8ea';
-    ctx.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2 + 6);
-    ctx.textAlign = 'left';
-  }
+// ---- Leaderboard overlay (opened from the title or pause menu) ----
 
-  centered(ctx, '(ESC or P to resume)', 428, 12, 'rgba(150, 190, 230, 0.7)', false, '');
+export const TITLE_LEADERBOARD_BUTTON: ButtonRect = {
+  x: W / 2 - 100,
+  y: H * 0.71,
+  w: 200,
+  h: 38,
+  label: '🏆 LEADERBOARD',
+};
+
+export const BOARD_BACK_BUTTON: ButtonRect = {
+  x: W / 2 - 90,
+  y: H * 0.85,
+  w: 180,
+  h: 40,
+  label: '‹ BACK',
+};
+
+export function drawLeaderboardScreen(
+  ctx: CanvasRenderingContext2D,
+  board: LeaderboardEntry[],
+  global: boolean,
+  highlightIndex = -1
+) {
+  dim(ctx, 0.9);
+  const x = (W - W * 0.38) / 2;
+  drawLeaderboard(ctx, board, highlightIndex, x, H * 0.2, global);
+  drawButton(ctx, BOARD_BACK_BUTTON);
+  centered(ctx, '(ESC to close)', H * 0.93, 12, 'rgba(150, 190, 230, 0.7)', false, '');
 }
 
 /** In-game milestone banner. progress: 0..1 across the banner's lifetime. */

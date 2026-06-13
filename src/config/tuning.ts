@@ -36,6 +36,11 @@ export const TUNING = {
   // Lives
   maxLives: 3,
 
+  // Hit penalty — a hit briefly slows the game, then it eases back to the speed
+  // you'd built up (the slowdown is temporary, not a permanent boost loss).
+  hitSlowMult: 0.6, // game speed right after a hit
+  hitSlowRecover: 3.5, // seconds to ease back to full speed
+
   // Obstacles
   spawnIntervalStart: 1.9, // average seconds between obstacles at game start
   spawnIntervalMin: 0.78, // floor at max difficulty
