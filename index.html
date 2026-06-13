@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>$OPEN: FASTER</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏠</text></svg>" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        width: 100%;
+        height: 100%;
+        background: #06090f;
+        overflow: hidden;
+        touch-action: none;
+        overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      canvas {
+        display: block;
+        image-rendering: pixelated;
+      }
+      #rotate-hint {
+        display: none;
+      }
+      #name-entry {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: #0a1322;
+        border: 2px solid #ffd84d;
+        box-shadow: 0 0 30px rgba(255, 216, 77, 0.35);
+        padding: 22px 28px;
+        text-align: center;
+        font-family: 'Courier New', monospace;
+        z-index: 10;
+      }
+      #name-entry.visible { display: block; }
+      #name-entry h2 {
+        color: #ffd84d;
+        font-size: 18px;
+        letter-spacing: 2px;
+        margin-bottom: 4px;
+      }
+      #name-entry p {
+        color: #c9d8ea;
+        font-size: 12px;
+        margin-bottom: 14px;
+      }
+      #name-input {
+        background: #06090f;
+        border: 1px solid #5fa8d8;
+        color: #37d67a;
+        font-family: 'Courier New', monospace;
+        font-size: 18px;
+        font-weight: bold;
+        text-align: center;
+        text-transform: uppercase;
+        padding: 8px 10px;
+        width: 200px;
+        outline: none;
+      }
+      #name-buttons {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        margin-top: 14px;
+      }
+      #name-buttons button {
+        border: none;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        font-weight: bold;
+        letter-spacing: 1px;
+        padding: 8px 18px;
+        cursor: pointer;
+      }
+      #name-submit {
+        background: #ffd84d;
+        color: #06090f;
+      }
+      #name-skip {
+        background: transparent;
+        border: 1px solid #5fa8d8 !important;
+        color: #5fa8d8;
+      }
+      @media (orientation: portrait) and (max-width: 700px) {
+        #rotate-hint {
+          display: block;
+          position: fixed;
+          bottom: 28px;
+          left: 0;
+          width: 100%;
+          text-align: center;
+          color: #5fa8d8;
+          font-family: 'Courier New', monospace;
+          font-size: 13px;
+          pointer-events: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <div id="rotate-hint">rotate your phone for the full trading floor 🔄</div>
+    <div id="name-entry">
+      <h2>★ TOP 10 TRADER ★</h2>
+      <p>your peak made the leaderboard — sign it</p>
+      <input id="name-input" maxlength="12" placeholder="YOUR NAME" autocomplete="off" />
+      <div id="name-buttons">
+        <button id="name-submit">RECORD IT</button>
+        <button id="name-skip">RESTART</button>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
