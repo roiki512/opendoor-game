@@ -219,6 +219,7 @@ export class Game {
     this.stateTime = 0;
     document.body.classList.add('is-playing');
     this.input.duckButtonHeld = false;
+    this.input.jumpButtonHeld = false;
     this.price.reset();
     this.chart = new Chart();
     this.player.reset();
@@ -436,7 +437,13 @@ export class Game {
         this.chart.update(dt, scroll);
 
         if (this.input.consumeJump() && this.player.tryJump()) this.sound.jump();
-        this.player.update(dt, this.chart.groundAt(this.player.x), this.input.duckHeld, scroll);
+        this.player.update(
+          dt,
+          this.chart.groundAt(this.player.x),
+          this.input.duckHeld,
+          scroll,
+          this.input.jumpHeld
+        );
 
         this.spawner.update(dt, scroll, this.nextMilestoneIdx, MILESTONES.length);
         this.pickups.update(dt, scroll);

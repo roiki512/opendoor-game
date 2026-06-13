@@ -24,7 +24,8 @@ export const TUNING = {
   // Player physics
   playerX: 0.25, // fraction of screen width
   gravity: 2300,
-  jumpVelocity: 720, // gives ~112px jump apex
+  jumpVelocity: 720, // full jump apex (~112px) when the button is held
+  jumpCutFactor: 0.42, // releasing early while rising cuts speed -> short hop
   fastFallBoost: 1300, // extra gravity while holding duck mid-air
   standWidth: 36,
   standHeight: 46,

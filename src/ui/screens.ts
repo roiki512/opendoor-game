@@ -114,9 +114,10 @@ export function drawHowTo(ctx: CanvasRenderingContext2D) {
   const lx = 70;
   sectionHead(ctx, 'CONTROLS', lx, 175);
   infoLine(ctx, 'JUMP   Space / ↑ / W  •  tap', lx, 202);
-  infoLine(ctx, 'DUCK   ↓ / S  •  hold', lx, 226);
-  infoLine(ctx, 'On phone: on-screen JUMP / DUCK buttons', lx, 250);
-  infoLine(ctx, 'Pause   Esc / P', lx, 274);
+  infoLine(ctx, '  hold longer = jump higher', lx, 224);
+  infoLine(ctx, 'DUCK   ↓ / S  •  hold', lx, 248);
+  infoLine(ctx, 'On phone: on-screen JUMP / DUCK buttons', lx, 272);
+  infoLine(ctx, 'Pause   Esc / P', lx, 296);
 
   sectionHead(ctx, 'POWER-UPS', lx, 318);
   spriteRow(
@@ -138,14 +139,15 @@ export function drawHowTo(ctx: CanvasRenderingContext2D) {
 
   // Right column: the shorts' obstacles
   const rx = 520;
-  sectionHead(ctx, 'DODGE THE SHORTS', rx, 175);
+  sectionHead(ctx, 'DODGE THE SHORTS', rx, 168);
   const ix = rx + 20;
   const tx = rx + 50;
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'wreckedHouse', x, y, 0.85), 'CONDEMNED HOUSE — jump', ix, tx, 210);
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'downGraph', x, y, 0.85), 'RED CHART — jump it (or duck a tall one!)', ix, tx, 252);
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'bear', x, y, 0.85), 'BEAR MARKET — jump', ix, tx, 294);
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'paper', x, y, 0.85), 'FUD HEADLINE — duck', ix, tx, 336);
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'flyingHouse', x, y, 0.85), 'RIVAL HOUSE — duck', ix, tx, 378);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'wreckedHouse', x, y, 0.8), 'CONDEMNED HOUSE — jump', ix, tx, 200);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'bear', x, y, 0.8), 'BEAR MARKET — jump (fast!)', ix, tx, 236);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'missile', x, y, 1), 'SELL-OFF MISSILE — bobs: jump or pass under', ix, tx, 272);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'downGraph', x, y, 0.42), 'CRASH WALL — too tall to jump, DUCK under', ix, tx, 308);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'paper', x, y, 0.8), 'FUD HEADLINE — duck', ix, tx, 344);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'flyingHouse', x, y, 0.8), 'RIVAL HOUSE — duck (swoops!)', ix, tx, 380);
 
   drawButton(ctx, HOWTO_BACK_BUTTON);
   centered(ctx, '(ESC to close)', H * 0.95, 12, 'rgba(150, 190, 230, 0.7)', false, '');

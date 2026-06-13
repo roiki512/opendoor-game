@@ -23,6 +23,8 @@ export class Input {
   pointerGuard: ((clientX: number, clientY: number) => boolean) | null = null;
   /** Held while the on-screen mobile DUCK button is pressed. */
   duckButtonHeld = false;
+  /** Held while the on-screen mobile JUMP button is pressed. */
+  jumpButtonHeld = false;
   private gestureSeen = false;
 
   constructor(target: HTMLElement) {
@@ -128,6 +130,17 @@ export class Input {
       this.keysDown.has('KeyS') ||
       this.duckButtonHeld ||
       (this.touchActive && this.touchDucking)
+    );
+  }
+
+  /** Whether a jump control is currently held (for variable jump height). */
+  get jumpHeld(): boolean {
+    return (
+      this.keysDown.has('Space') ||
+      this.keysDown.has('ArrowUp') ||
+      this.keysDown.has('KeyW') ||
+      this.jumpButtonHeld ||
+      (this.touchActive && !this.touchDucking)
     );
   }
 

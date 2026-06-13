@@ -14,6 +14,8 @@ export class Player {
   feetY = 0;
   private vy = 0;
   private grounded = true;
+  /** True after a jump until the rise is cut short or the apex is reached. */
+  private canCutJump = false;
   ducking = false;
   /** Cosmetic upgrade from the "Opendoor 2.0" milestone. */
   upgraded = false;
@@ -26,6 +28,7 @@ export class Player {
   reset() {
     this.vy = 0;
     this.grounded = true;
+    this.canCutJump = false;
     this.ducking = false;
     this.upgraded = false;
     this.boosting = false;
@@ -53,10 +56,17 @@ export class Player {
     this.vy = -TUNING.jumpVelocity;
     this.grounded = false;
     this.ducking = false;
+    this.canCutJump = true; // a short tap can cut this jump short (see update)
     return true;
   }
 
-  update(dt: number, groundY: number, duckHeld: boolean, scrollSpeed: number) {
+  update(
+    dt: number,
+    groundY: number,
+    duckHeld: boolean,
+    scrollSpeed: number,
+    jumpHeld = true
+  ) {
     this.runPhase += dt * scrollSpeed * 0.055;
     if (this.shieldTime > 0) this.shieldTime = Math.max(0, this.shieldTime - dt);
     if (this.invincibleTime > 0) this.invincibleTime = Math.max(0, this.invincibleTime - dt);
@@ -72,6 +82,17 @@ export class Player {
     }
 
     if (!this.grounded) {
+      // Variable jump height: releasing the button while still rising cuts the
+      // upward speed, turning a hold into a full jump and a tap into a short hop.
+      if (this.canCutJump && this.vy < 0) {
+        if (!jumpHeld) {
+          this.vy *= TUNING.jumpCutFactor;
+          this.canCutJump = false;
+        }
+      } else {
+        this.canCutJump = false; // past the apex — nothing left to cut
+      }
+
       // Holding duck in the air = fast-fall, so ducks feel responsive.
       const g = TUNING.gravity + (duckHeld ? TUNING.fastFallBoost : 0);
       this.vy += g * dt;

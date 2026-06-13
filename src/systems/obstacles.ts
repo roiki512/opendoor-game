@@ -4,11 +4,13 @@ import type { Box } from './player';
 // The shorts' arsenal. Heights are relative to the ground line:
 //  - 'wreckedHouse', 'bear' sit on the ground -> must JUMP
 //  - 'paper', 'flyingHouse' fly high -> must DUCK
-//  - 'downGraph' is random per spawn: a small ground chart (JUMP) or a tall
-//    hanging crash-wall too high to clear (DUCK) — you must read it fast
+//  - 'downGraph' is a tall static crash-wall, too high to jump -> must DUCK
+//  - 'missile' bobs down and up as it flies -> JUMP it when low, slip UNDER
+//    it when high (so you don't always jump)
 export type ObstacleKind =
   | 'wreckedHouse'
   | 'downGraph'
+  | 'missile'
   | 'paper'
   | 'flyingHouse'
   | 'bear';
@@ -26,71 +28,54 @@ interface KindSpec {
 
 const SPECS: Record<ObstacleKind, KindSpec> = {
   wreckedHouse: { w: 38, h: 36, clearance: 0, extraSpeed: 0, minTier: 0 },
-  // downGraph spawns in one of two random forms (see Obstacle): a small chart on
-  // the GROUND (jump) or a tall hanging crash-wall (duck). This spec is the
-  // ground form; the tall form is DOWNGRAPH_HIGH below.
-  downGraph: { w: 42, h: 22, clearance: 0, extraSpeed: 0, minTier: 0 },
   paper: { w: 40, h: 30, clearance: 34, extraSpeed: 0, minTier: 0 },
+  // A tall static crash-wall whose top sits above the jump apex (~112px): it
+  // blocks your jump, so you must DUCK under the gap at its base.
+  downGraph: { w: 44, h: 86, clearance: 32, extraSpeed: 0, minTier: 1 },
+  // Bobs vertically as it flies (clearance comes from effClearance, not here).
+  missile: { w: 40, h: 16, clearance: 0, extraSpeed: 0, minTier: 1 },
   // extraSpeed kept modest so these faster movers can't overtake a slower
   // obstacle ahead of them (which could force an impossible jump+duck).
   flyingHouse: { w: 44, h: 30, clearance: 34, extraSpeed: 60, minTier: 1 },
   bear: { w: 44, h: 34, clearance: 0, extraSpeed: 55, minTier: 2 },
 };
 
-// downGraph is a "crashing chart": it descends from above as it crosses and
-// settles into one of two resting places by the time it reaches the player —
-//  - JUMP form: a small chart that lands ON the ground (jump over it)
-//  - DUCK form: a tall wall that stops at head height; its top sits above the
-//    jump apex (~112px) so it CANNOT be jumped — you must duck under it.
-const DG_JUMP = { h: 30, startClear: 64, targetClear: 0 };
-const DG_DUCK = { h: 88, startClear: 150, targetClear: 32 };
-const PLAYER_X = TUNING.width * TUNING.playerX;
-const SPAWN_X = TUNING.width + 80;
 // Rival houses swoop up and down the whole time they travel (px amplitude).
 // Kept so the gap underneath stays duckable at the low point (never a jump).
 const FLYINGHOUSE_SWOOP = 10;
+// The "sell-off missile" bobs down and up as it flies: low => JUMP it, high =>
+// run UNDER it. clearance oscillates between ~4 (on the deck) and ~52 (overhead).
+const MISSILE_BASE = 28;
+const MISSILE_AMP = 24;
+const MISSILE_FREQ = 0.018;
 
 export class Obstacle {
   x: number;
   kind: ObstacleKind;
   spin = Math.random() * Math.PI * 2;
   fleeing = false;
-  /** downGraph only: true = descends to a tall DUCK wall, false = ground JUMP. */
-  duckVariant = false;
+  /** Random phase so each missile's down/up rhythm is unpredictable. */
+  private phase = Math.random() * Math.PI * 2;
 
   constructor(kind: ObstacleKind, x: number) {
     this.kind = kind;
     this.x = x;
-    if (kind === 'downGraph') this.duckVariant = Math.random() < 0.5;
   }
 
   get spec(): KindSpec {
     return SPECS[this.kind];
   }
 
-  /** 0 at spawn → 1 by the time the obstacle reaches the player's x. */
-  private get approach(): number {
-    const p = (SPAWN_X - this.x) / (SPAWN_X - PLAYER_X);
-    return Math.min(1, Math.max(0, p));
-  }
-
-  /** Bottom-edge clearance. For downGraph this eases as the chart descends. */
+  /** Bottom-edge clearance. The missile's oscillates as it flies. */
   get effClearance(): number {
-    if (this.kind === 'downGraph') {
-      const v = this.duckVariant ? DG_DUCK : DG_JUMP;
-      const e = 1 - (1 - this.approach) * (1 - this.approach); // easeOutQuad
-      return v.startClear + (v.targetClear - v.startClear) * e;
+    if (this.kind === 'missile') {
+      return MISSILE_BASE + Math.sin(this.x * MISSILE_FREQ + this.phase) * MISSILE_AMP;
     }
     return SPECS[this.kind].clearance;
   }
-  get effHeight(): number {
-    if (this.kind === 'downGraph') return this.duckVariant ? DG_DUCK.h : DG_JUMP.h;
-    return SPECS[this.kind].h;
-  }
   /** A "high" obstacle must be ducked under (vs. a ground one you jump over). */
   get isHigh(): boolean {
-    if (this.kind === 'downGraph') return this.duckVariant;
-    return SPECS[this.kind].clearance > 0;
+    return SPECS[this.kind].clearance > 0; // missile base 0 -> treated as ground
   }
 
   update(dt: number, scrollSpeed: number) {
@@ -101,17 +86,16 @@ export class Obstacle {
 
   /** AABB in screen space; groundY sampled at the obstacle's x. */
   hitbox(groundY: number): Box {
-    const w = SPECS[this.kind].w;
-    const h = this.effHeight;
+    const s = SPECS[this.kind];
     let bob = 0;
     if (this.kind === 'flyingHouse') {
       bob = Math.sin(this.x * 0.012) * FLYINGHOUSE_SWOOP; // continuous up/down swoop
     }
     return {
-      x: this.x - w / 2,
-      y: groundY - this.effClearance - h + bob,
-      w,
-      h,
+      x: this.x - s.w / 2,
+      y: groundY - this.effClearance - s.h + bob,
+      w: s.w,
+      h: s.h,
     };
   }
 
@@ -217,6 +201,51 @@ export class Obstacle {
         ctx.lineTo(ex, ey - 7);
         ctx.closePath();
         ctx.fill();
+        break;
+      }
+      case 'missile': {
+        // A red "sell-off" dart firing in low, bobbing down and up.
+        ctx.translate(cx, cy);
+        const w = b.w;
+        const h = b.h;
+        // Flame tail (trailing right)
+        const flick = Math.random() * 5;
+        ctx.fillStyle = '#ffd24d';
+        ctx.beginPath();
+        ctx.moveTo(w * 0.28, -h * 0.4);
+        ctx.lineTo(w * 0.7 + flick, 0);
+        ctx.lineTo(w * 0.28, h * 0.4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#ff8a3d';
+        ctx.beginPath();
+        ctx.moveTo(w * 0.28, -h * 0.24);
+        ctx.lineTo(w * 0.5 + flick * 0.5, 0);
+        ctx.lineTo(w * 0.28, h * 0.24);
+        ctx.closePath();
+        ctx.fill();
+        // Dart body (pointed left, the way it travels)
+        ctx.fillStyle = '#ff3b3b';
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.5, 0); // nose
+        ctx.lineTo(-w * 0.16, -h * 0.5);
+        ctx.lineTo(w * 0.32, -h * 0.5);
+        ctx.lineTo(w * 0.32, h * 0.5);
+        ctx.lineTo(-w * 0.16, h * 0.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#7a0d0d';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        // Down-tick fin (it's a sell-off) + glint
+        ctx.strokeStyle = '#7a0d0d';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(w * 0.18, -h * 0.5);
+        ctx.lineTo(w * 0.34, -h * 0.95);
+        ctx.stroke();
+        ctx.fillStyle = '#ffd0d0';
+        ctx.fillRect(-w * 0.34, -h * 0.18, w * 0.16, 2.5);
         break;
       }
       case 'paper': {
@@ -496,7 +525,7 @@ export class ObstacleSpawner {
       (k) =>
         SPECS[k].minTier <= tier &&
         SPECS[k].extraSpeed === 0 &&
-        k !== 'downGraph' &&
+        k !== 'missile' && // its height varies — keep combo actions predictable
         SPECS[k].clearance > 0 === wantHigh
     );
     if (kinds.length === 0) return null;
@@ -518,10 +547,9 @@ export function drawObstacleIcon(
 ) {
   const o = new Obstacle(kind, 0);
   o.spin = 0; // freeze the animation for a clean still
-  o.duckVariant = false; // downGraph: show the small ground form in menus
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(scale, scale);
-  o.draw(ctx, o.effClearance + o.effHeight / 2); // center the sprite on the origin
+  o.draw(ctx, o.effClearance + SPECS[kind].h / 2); // center the sprite on the origin
   ctx.restore();
 }
