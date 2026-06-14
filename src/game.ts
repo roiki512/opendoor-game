@@ -464,7 +464,8 @@ export class Game {
         );
 
         this.spawner.update(dt, scroll, this.nextMilestoneIdx, MILESTONES.length);
-        this.pickups.update(dt, scroll);
+        // Short-squeeze shields only start dropping once you've passed $34.
+        this.pickups.update(dt, scroll, this.price.price >= 34);
 
         // Collisions. Obstacles are positioned against the player's own ground
         // height (they collide at the player's x anyway), so terrain bumps can
@@ -500,7 +501,7 @@ export class Game {
               this.pillCount++;
               if (this.pillCount % TUNING.pillsPerSpeedUp === 0) {
                 this.speedMultiplier *= TUNING.pillSpeedStep;
-                this.sound.milestone();
+                this.sound.faster();
                 this.particles.floatText(p.x, py - 90, '⚡ FASTER!', '#ffd84d');
               } else {
                 this.sound.boostPickup();
@@ -560,7 +561,6 @@ export class Game {
         peak: this.price.peak,
         lives: this.lives,
         speedMultiplier: this.speedMultiplier * this.rocketFactor * this.hitSlowFactor,
-        momentum: this.price.momentum,
         pillProgress: this.pillCount % TUNING.pillsPerSpeedUp,
         pillsPerStep: TUNING.pillsPerSpeedUp,
         nextMilestone: this.milestoneAt(this.nextMilestoneIdx),

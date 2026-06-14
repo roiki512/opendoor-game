@@ -179,17 +179,17 @@ export class PickupSpawner {
     this.nextSpawnIn = 5;
   }
 
-  update(dt: number, scrollSpeed: number) {
+  update(dt: number, scrollSpeed: number, allowSqueeze = true) {
     for (const p of this.pickups) p.update(dt, scrollSpeed);
     this.pickups = this.pickups.filter((p) => p.x > -60 && !p.collected);
 
     this.nextSpawnIn -= dt;
     if (this.nextSpawnIn <= 0) {
       // Pills are the common drop (they drive speed); rockets uncommon; the
-      // short-squeeze shield is rare.
+      // short-squeeze shield is rare and only unlocks past $34.
       const r = Math.random();
       let kind: PickupKind = 'pill';
-      if (r < TUNING.squeezeChance) kind = 'squeeze';
+      if (allowSqueeze && r < TUNING.squeezeChance) kind = 'squeeze';
       else if (r < TUNING.squeezeChance + TUNING.rocketChance) kind = 'rocket';
       this.pickups.push(new Pickup(TUNING.width + 60, kind));
       this.nextSpawnIn =

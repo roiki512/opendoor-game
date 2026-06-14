@@ -52,6 +52,7 @@ export const TUNING = {
   // a duck, or jump-duck-jump) close behind. Drives the jump<->duck rhythm.
   clusterChanceMax: 0.6, // partner chance at full difficulty
   clusterGap: 0.75, // seconds between the pair (enough to land a jump, then duck)
+  bearPackChance: 0.4, // chance a bear charges in as a pack of 2-3
   startGrace: 2.4, // calm seconds at the start of a run before the first short
 
   // "EARNINGS DAY" volatility surges — periodic combo-dense bursts.

@@ -34,17 +34,19 @@ const SPECS: Record<ObstacleKind, KindSpec> = {
   crashChart: { w: 44, h: 86, clearance: 32, extraSpeed: 0, minTier: 1 },
   // Rival house — flies forward (extraSpeed) AND zig-zags vertically.
   flyingHouse: { w: 44, h: 30, clearance: 26, extraSpeed: 45, minTier: 1 },
-  bear: { w: 44, h: 34, clearance: 0, extraSpeed: 55, minTier: 2 },
+  // Bears charge in from the very start — fast, and sometimes in packs.
+  bear: { w: 44, h: 34, clearance: 0, extraSpeed: 55, minTier: 0 },
 };
 
-// The bobbing FUD: clearance oscillates ~2 (on the deck) .. ~50 (overhead).
-const FUD_BASE = 26;
-const FUD_AMP = 24;
-const FUD_FREQ = 0.018;
-// The rival's zig-zag: clearly low (jump) .. clearly high (duck). Triangle wave.
-const ZIG_BASE = 26;
-const ZIG_AMP = 24;
-const ZIG_FREQ = 0.014;
+// The bobbing FUD rides high so there's usually room to duck under it: clearance
+// oscillates ~22 (duck) .. ~50 (slip under). It rarely drops to a jump.
+const FUD_BASE = 36;
+const FUD_AMP = 14;
+const FUD_FREQ = 0.014;
+// The rival's zig-zag, raised so ducking is more often an option. Triangle wave.
+const ZIG_BASE = 34;
+const ZIG_AMP = 18;
+const ZIG_FREQ = 0.013;
 
 /** Sharp triangle wave: period 2π, range [-1, 1]. */
 function triWave(t: number): number {
@@ -408,12 +410,18 @@ export class ObstacleSpawner {
       this.firstSpawnDone = true;
 
       // Bring complementary partner(s) -> jump<->duck (<->jump) combos. Surges
-      // are nearly always combos. The first obstacle of a run never clusters.
+      // are nearly always combos. The first obstacle of a run never combos.
       let clusterChance = Math.min(0.8, TUNING.clusterChanceMax * difficulty + endless);
       if (surging) clusterChance = 0.97;
-      if (wasFirst) clusterChance = 0;
 
-      if (Math.random() < clusterChance) {
+      if (wasFirst) {
+        // no combo on the very first obstacle
+      } else if (primary.kind === 'bear' && Math.random() < TUNING.bearPackChance) {
+        // A charging pack: 1-2 more bears in quick succession (all jumps).
+        const extra = Math.random() < 0.4 ? 2 : 1;
+        for (let i = 0; i < extra; i++) this.queue.push('bear');
+        this.pendingIn = TUNING.clusterGap;
+      } else if (Math.random() < clusterChance) {
         let wantHigh = !primary.isHigh; // first partner is the opposite action
         const p1 = this.pickPartner(tier, wantHigh);
         if (p1) {

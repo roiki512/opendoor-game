@@ -1,5 +1,6 @@
 import { TUNING } from '../config/tuning';
 import { formatPrice } from '../systems/price';
+import { drawPickupIcon } from '../systems/pickups';
 import type { Milestone } from '../config/milestones';
 
 const MONO = '"Courier New", monospace';
@@ -9,7 +10,6 @@ export interface HudState {
   peak: number;
   lives: number;
   speedMultiplier: number;
-  momentum: number;
   /** AI pills collected toward the next speed step (0..pillsPerStep). */
   pillProgress: number;
   pillsPerStep: number;
@@ -97,30 +97,24 @@ export function drawHud(ctx: CanvasRenderingContext2D, s: HudState) {
   // ---- Speed meter (bottom-center, above ticker — clear of the on-screen
   //      JUMP/DUCK buttons that sit in the bottom corners on touch devices) ----
   const cx = W / 2;
-  const barW = 150;
-  // AI-pill progress toward the next FASTER step
-  const pipGap = 15;
+  // AI-pill progress toward the next FASTER step — faded pills fill in as you
+  // collect them.
+  const pipGap = 24;
   const pipStart = cx - ((s.pillsPerStep - 1) * pipGap) / 2;
   for (let i = 0; i < s.pillsPerStep; i++) {
-    ctx.beginPath();
-    ctx.arc(pipStart + i * pipGap, TUNING.height - 64, 4, 0, Math.PI * 2);
-    ctx.fillStyle = i < s.pillProgress ? '#39c2ff' : 'rgba(120, 150, 180, 0.3)';
-    ctx.fill();
+    ctx.globalAlpha = i < s.pillProgress ? 1 : 0.25;
+    drawPickupIcon(ctx, 'pill', pipStart + i * pipGap, TUNING.height - 50, 0.5);
   }
+  ctx.globalAlpha = 1;
   ctx.font = `8px ${MONO}`;
   ctx.fillStyle = 'rgba(150, 190, 230, 0.65)';
   ctx.textAlign = 'center';
-  ctx.fillText('AI PILLS → FASTER', cx, TUNING.height - 73);
+  ctx.fillText('AI PILLS → FASTER', cx, TUNING.height - 64);
 
   const speedText = `FASTER ×${s.speedMultiplier.toFixed(2)}`;
   ctx.font = `bold 16px ${MONO}`;
   ctx.fillStyle = '#ffb13d';
-  ctx.fillText(speedText, cx, TUNING.height - 44);
-  // Momentum bar
-  ctx.fillStyle = 'rgba(40, 60, 90, 0.6)';
-  ctx.fillRect(cx - barW / 2, TUNING.height - 36, barW, 6);
-  ctx.fillStyle = '#39c2ff';
-  ctx.fillRect(cx - barW / 2, TUNING.height - 36, barW * s.momentum, 6);
+  ctx.fillText(speedText, cx, TUNING.height - 30);
   ctx.textAlign = 'left';
 
   // ---- Mute button ----

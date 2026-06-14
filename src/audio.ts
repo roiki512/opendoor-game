@@ -83,9 +83,14 @@ export class Sound {
     this.tone(1100, 0.08, 0.12, 'triangle', 0.15);
   }
 
+  /** Price milestone fanfare (no voice — the FASTER bark is for pills now). */
   milestone() {
     const notes = [523, 659, 784, 1047]; // C E G C
     notes.forEach((f, i) => this.tone(f, i * 0.09, 0.18, 'square', 0.14));
+  }
+
+  /** Barked "FASTER!" — fires when you collect enough AI pills to speed up. */
+  faster() {
     this.sayFaster();
   }
 
