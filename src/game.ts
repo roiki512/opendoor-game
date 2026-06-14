@@ -571,7 +571,7 @@ export class Game {
       );
     }
 
-    this.chart.drawBackdrop(ctx, this.tint, this.tintStrength);
+    this.chart.drawBackdrop(ctx, this.tint, this.tintStrength, this.price.price);
     this.chart.drawAxis(ctx, this.price.price);
     this.chart.drawChartLine(ctx);
 

@@ -9,6 +9,14 @@ import { TICKER_HEADLINES } from '../config/milestones';
 
 const SAMPLE_SPACING = 14; // px between terrain samples
 
+/** Linear-interpolate two #rrggbb colors; returns an "rgb(...)" string. */
+function lerpHex(a: string, b: string, t: number): string {
+  const pa = [parseInt(a.slice(1, 3), 16), parseInt(a.slice(3, 5), 16), parseInt(a.slice(5, 7), 16)];
+  const pb = [parseInt(b.slice(1, 3), 16), parseInt(b.slice(3, 5), 16), parseInt(b.slice(5, 7), 16)];
+  const c = pa.map((v, i) => Math.round(v + (pb[i] - v) * t));
+  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+}
+
 export class Chart {
   private samples: number[] = [];
   private scrollOffset = 0; // 0..SAMPLE_SPACING, sub-sample scroll
@@ -18,12 +26,26 @@ export class Chart {
   private tickerX = 0;
   private tickerText: string;
   private gridScroll = 0;
+  private skyScroll = 0; // slow parallax for stars/skyline
+  /** Decorative starfield (fades in as the climb gets higher / later). */
+  private stars: { x: number; y: number; r: number; a: number }[] = [];
+  /** Distant skyline silhouette heights (fades in mid-climb). */
+  private buildings: number[] = [];
   time = 0;
 
   constructor() {
     this.tickerText = TICKER_HEADLINES.join('   •   ') + '   •   ';
     const count = Math.ceil(TUNING.width / SAMPLE_SPACING) + 3;
     for (let i = 0; i < count; i++) this.samples.push(this.nextSample());
+    for (let i = 0; i < 70; i++) {
+      this.stars.push({
+        x: Math.random() * TUNING.width,
+        y: Math.random() * TUNING.height * 0.6,
+        r: Math.random() < 0.7 ? 1 : 2,
+        a: 0.4 + Math.random() * 0.6,
+      });
+    }
+    for (let i = 0; i < 16; i++) this.buildings.push(40 + Math.random() * 90);
   }
 
   private nextSample(): number {
@@ -55,6 +77,7 @@ export class Chart {
     this.crashOffset += (this.crashTarget - this.crashOffset) * Math.min(1, ease * dt);
 
     this.gridScroll = (this.gridScroll + scrollSpeed * 0.25 * dt) % 80;
+    this.skyScroll += scrollSpeed * 0.05 * dt; // distant parallax
     this.tickerX -= 110 * dt;
   }
 
@@ -73,15 +96,50 @@ export class Chart {
     return this.crashOffset > 6;
   }
 
-  drawBackdrop(ctx: CanvasRenderingContext2D, tint: string, tintStrength: number) {
+  drawBackdrop(
+    ctx: CanvasRenderingContext2D,
+    tint: string,
+    tintStrength: number,
+    price: number = TUNING.startPrice
+  ) {
     const W = TUNING.width;
     const H = TUNING.height;
+    const ph = this.phase(price);
 
+    // Sky gradient — evolves from the dawn trading floor up toward space.
     const grad = ctx.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, '#0a1322');
-    grad.addColorStop(1, '#06090f');
+    grad.addColorStop(0, ph.top);
+    grad.addColorStop(1, ph.bot);
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
+
+    // Starfield (fades in as you climb higher)
+    if (ph.star > 0.01) {
+      ctx.fillStyle = '#cfe0ff';
+      for (const s of this.stars) {
+        let x = (s.x - this.skyScroll * (0.4 + s.r * 0.25)) % W;
+        if (x < 0) x += W;
+        const tw = 0.65 + Math.sin(this.time * 1.8 + s.x) * 0.35;
+        ctx.globalAlpha = ph.star * s.a * tw;
+        ctx.fillRect(x, s.y, s.r, s.r);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // Distant skyline silhouette (fades in around the city phase)
+    if (ph.sky > 0.01) {
+      ctx.globalAlpha = ph.sky;
+      ctx.fillStyle = '#0b1020';
+      const horizon = H * TUNING.groundBase;
+      const bw = W / 12;
+      for (let i = 0; i < this.buildings.length; i++) {
+        let bx = (i * bw - (this.skyScroll * 0.5) % (W + bw)) % (W + bw);
+        if (bx < -bw) bx += W + bw;
+        const bh = this.buildings[i];
+        ctx.fillRect(bx, horizon - bh, bw - 4, bh);
+      }
+      ctx.globalAlpha = 1;
+    }
 
     if (tintStrength > 0.01) {
       ctx.globalAlpha = tintStrength * 0.1;
@@ -90,8 +148,8 @@ export class Chart {
       ctx.globalAlpha = 1;
     }
 
-    // Grid
-    ctx.strokeStyle = 'rgba(80, 130, 190, 0.13)';
+    // Grid (the trading-terminal feel) — eases back as the sky takes over.
+    ctx.strokeStyle = `rgba(80, 130, 190, ${0.13 * (1 - ph.star * 0.55)})`;
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let x = -this.gridScroll; x < W; x += 80) {
@@ -103,6 +161,31 @@ export class Chart {
       ctx.lineTo(W, y);
     }
     ctx.stroke();
+  }
+
+  /** Interpolated backdrop look for the current price (the "journey"). */
+  private phase(price: number): { top: string; bot: string; sky: number; star: number } {
+    const stops = [
+      { p: 0.51, top: '#0a1322', bot: '#06090f', sky: 0, star: 0 }, // dawn terminal
+      { p: 8, top: '#241a3a', bot: '#0a0a16', sky: 1, star: 0.25 }, // city dusk
+      { p: 34, top: '#0c1430', bot: '#05060f', sky: 0.55, star: 0.7 }, // night
+      { p: 220, top: '#0a0618', bot: '#02030a', sky: 0, star: 1 }, // space
+    ];
+    const lp = Math.log(Math.max(0.51, price));
+    let i = 0;
+    while (i < stops.length - 2 && lp >= Math.log(stops[i + 1].p)) i++;
+    const a = stops[i];
+    const b = stops[i + 1];
+    const f = Math.max(
+      0,
+      Math.min(1, (lp - Math.log(a.p)) / (Math.log(b.p) - Math.log(a.p)))
+    );
+    return {
+      top: lerpHex(a.top, b.top, f),
+      bot: lerpHex(a.bot, b.bot, f),
+      sky: a.sky + (b.sky - a.sky) * f,
+      star: a.star + (b.star - a.star) * f,
+    };
   }
 
   /** Right-side price axis: labels drift so the ground line ~= current price. */
