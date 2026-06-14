@@ -433,12 +433,14 @@ export class Game {
         this.hitSlowTime = Math.max(0, this.hitSlowTime - dt);
         this.player.boosting = this.rocketTime > 0;
 
-        // EARNINGS DAY: periodic combo-dense volatility surges.
+        // EARNINGS DAY: periodic combo-dense volatility surges that escalate as
+        // you climb — longer and more frequent the deeper you get.
         this.surgeTimer -= dt;
         if (this.surgeTimer <= 0) {
-          this.spawner.startSurge();
-          this.surgeTimer =
-            TUNING.surgeInterval + (Math.random() * 2 - 1) * TUNING.surgeIntervalJitter;
+          const p = this.nextMilestoneIdx;
+          this.spawner.startSurge(Math.min(9, TUNING.surgeDuration + p * 0.4));
+          const interval = Math.max(11, TUNING.surgeInterval - p * 1.3);
+          this.surgeTimer = interval + (Math.random() * 2 - 1) * TUNING.surgeIntervalJitter;
           this.particles.floatText(
             TUNING.width / 2,
             TUNING.height * 0.32,

@@ -370,9 +370,9 @@ export class ObstacleSpawner {
     this.surgeTime = 0;
   }
 
-  /** Kick off an EARNINGS DAY surge (a short, combo-dense burst). */
-  startSurge() {
-    this.surgeTime = TUNING.surgeDuration;
+  /** Kick off an EARNINGS DAY surge (a combo-dense burst). */
+  startSurge(duration: number = TUNING.surgeDuration) {
+    this.surgeTime = duration;
   }
 
   /**
@@ -432,8 +432,9 @@ export class ObstacleSpawner {
       if (wasFirst) {
         // no combo on the very first obstacle
       } else if (bearPrimary && Math.random() < TUNING.bearPackChance) {
-        // A charging pack: 1-2 more bears in quick succession (all jumps).
-        const extra = Math.random() < 0.4 ? 2 : 1;
+        // A charging pack: more bears the deeper you are (packs of 2-4).
+        const extra =
+          1 + (Math.random() < 0.45 + endless ? 1 : 0) + (Math.random() < endless ? 1 : 0);
         for (let i = 0; i < extra; i++) this.queue.push('bear');
         this.pendingIn = TUNING.clusterGap;
       } else if (bearPrimary || Math.random() < clusterChance) {
@@ -441,12 +442,14 @@ export class ObstacleSpawner {
         const p1 = this.pickPartner(tier, wantHigh);
         if (p1) {
           this.queue.push(p1);
-          // Often a third (jump-duck-jump) at higher difficulty / during surges.
-          const tripleChance = (surging ? 0.7 : 0) + Math.min(0.55, difficulty * 0.45 + endless);
-          if (Math.random() < tripleChance) {
+          // Longer jump-duck-jump(-duck) chains at higher difficulty / surges.
+          let chain = (surging ? 0.7 : 0) + Math.min(0.7, difficulty * 0.5 + endless);
+          while (Math.random() < chain && this.queue.length < 4) {
             wantHigh = !wantHigh;
-            const p2 = this.pickPartner(tier, wantHigh);
-            if (p2) this.queue.push(p2);
+            const pn = this.pickPartner(tier, wantHigh);
+            if (!pn) break;
+            this.queue.push(pn);
+            chain *= 0.7; // each extra link is less likely
           }
           this.pendingIn = TUNING.clusterGap;
         }
@@ -457,10 +460,15 @@ export class ObstacleSpawner {
         TUNING.spawnIntervalStart -
         (TUNING.spawnIntervalStart - TUNING.spawnIntervalMin) * difficulty;
       const jitter = 1 + (Math.random() * 2 - 1) * TUNING.spawnJitter;
-      // Normalize by speed a little so high speed doesn't wall you in. The
-      // floor guarantees enough time to land a jump before the next obstacle.
-      const speedComp = Math.sqrt(scrollSpeed / TUNING.baseScroll);
-      this.nextSpawnIn = Math.max(0.78 - endless * 0.08, (base * jitter) / speedComp);
+      // The minimum gap TIGHTENS as you speed up — otherwise a fixed-airtime
+      // jump sails over the (speed-stretched) gaps and high speed feels easy.
+      const speedRatio = scrollSpeed / TUNING.baseScroll;
+      const floor = Math.max(
+        TUNING.spawnFloorMin,
+        TUNING.spawnFloorBase - (speedRatio - 1) * TUNING.spawnFloorSpeedDrop - endless * 0.06
+      );
+      const speedComp = Math.sqrt(speedRatio);
+      this.nextSpawnIn = Math.max(floor, (base * jitter) / speedComp);
     }
   }
 

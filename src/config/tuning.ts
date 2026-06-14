@@ -46,6 +46,11 @@ export const TUNING = {
   spawnIntervalStart: 1.9, // average seconds between obstacles at game start
   spawnIntervalMin: 0.78, // floor at max difficulty
   spawnJitter: 0.55, // +/- randomness fraction of the interval
+  // Minimum gap between obstacles, which tightens as scroll speed climbs so the
+  // late/fast game doesn't get easy (fixed-airtime jumps sailing over big gaps).
+  spawnFloorBase: 0.82, // floor at base speed
+  spawnFloorSpeedDrop: 0.13, // how much the floor drops per +1x speed ratio
+  spawnFloorMin: 0.6, // hard floor (keeps consecutive jumps/ducks fair)
   shieldDuration: 10, // shield (short-squeeze item): absorbs one hit or expires
 
   // Cluster combos — an obstacle often brings a complementary partner (jump then
