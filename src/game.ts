@@ -505,6 +505,14 @@ export class Game {
         const collideGround = this.chart.groundAt(this.player.x);
         for (const o of this.spawner.obstacles) {
           if (o.fleeing) continue;
+          if (o.kind === 'pit') {
+            // Rug pull: you fall in only if you're on the ground as it passes.
+            if (this.player.onGround && Math.abs(o.x - this.player.x) < o.spec.w / 2 - 12) {
+              this.takeHit();
+              break;
+            }
+            continue;
+          }
           if (boxesOverlap(pbox, o.hitbox(collideGround))) {
             this.takeHit();
             break;

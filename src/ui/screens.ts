@@ -130,11 +130,12 @@ export function drawHowTo(ctx: CanvasRenderingContext2D) {
   sectionHead(ctx, 'DODGE THE SHORTS', rx, 168);
   const ix = rx + 20;
   const tx = rx + 50;
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'wreckedHouse', x, y, 0.8), 'CONDEMNED HOUSE — jump', ix, tx, 206);
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'bear', x, y, 0.8), 'BEAR MARKET — jump (fast!)', ix, tx, 244);
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'fud', x, y, 1), 'FUD REPORT — bobs: jump it low, slip under high', ix, tx, 282);
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'crashChart', x, y, 0.42), 'CRASH CHART — too tall to jump, DUCK under', ix, tx, 320);
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'flyingHouse', x, y, 0.8), 'RIVAL HOUSE — zig-zags: jump low, duck high', ix, tx, 358);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'wreckedHouse', x, y, 0.75), 'CONDEMNED HOUSE — jump', ix, tx, 198);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'bear', x, y, 0.75), 'BEAR MARKET — jump (fast!)', ix, tx, 234);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'fud', x, y, 0.95), 'FUD REPORT — bobs: jump it low, slip under high', ix, tx, 270);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'crashChart', x, y, 0.4), 'CRASH CHART — too tall to jump, DUCK under', ix, tx, 306);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'flyingHouse', x, y, 0.75), 'RIVAL HOUSE — zig-zags: jump low, duck high', ix, tx, 342);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'pit', x, y, 0.55), 'RUG PULL — a gap in the floor, JUMP across', ix, tx, 378);
 
   drawButton(ctx, HOWTO_BACK_BUTTON);
   centered(ctx, '(ESC to close)', H * 0.95, 12, 'rgba(150, 190, 230, 0.7)', false, '');

@@ -7,12 +7,15 @@ import type { Box } from './player';
 //  - 'fud'           FUD report, bobs down/up  -> JUMP it low, slip UNDER it high
 //  - 'crashChart'    tall red chart, static    -> too tall to jump, DUCK under
 //  - 'flyingHouse'   rival, sharp zig-zag      -> JUMP it low, DUCK it high
+//  - 'pit'           a "rug pull" gap in the floor -> JUMP across it (you fall
+//    in if you're on the ground — standing or ducking — when it passes)
 export type ObstacleKind =
   | 'wreckedHouse'
   | 'fud'
   | 'crashChart'
   | 'flyingHouse'
-  | 'bear';
+  | 'bear'
+  | 'pit';
 
 interface KindSpec {
   w: number;
@@ -37,6 +40,9 @@ const SPECS: Record<ObstacleKind, KindSpec> = {
   // Bears charge in from the very start — a bit fast (kept modest so they can
   // combo with other obstacles fairly), and they always bring company.
   bear: { w: 44, h: 34, clearance: 0, extraSpeed: 40, minTier: 0 },
+  // A "rug pull" gap in the floor — collision is special (see game.ts): you
+  // fall in if grounded as it passes. Unlocks later in the climb.
+  pit: { w: 84, h: 10, clearance: 0, extraSpeed: 0, minTier: 4 },
 };
 
 // The bobbing FUD rides high so there's usually room to duck under it: clearance
@@ -308,6 +314,45 @@ export class Obstacle {
         ctx.stroke();
         break;
       }
+      case 'pit': {
+        // A "rug pull" chasm in the floor — jump across it.
+        const top = b.y + b.h; // ground-line level
+        const w = b.w;
+        const depth = 58;
+        ctx.fillStyle = '#04060c';
+        ctx.fillRect(b.x, top, w, depth);
+        // Torn red edges (the rug yanked out from under you)
+        ctx.strokeStyle = '#ff4646';
+        ctx.lineWidth = 3;
+        ctx.shadowColor = '#ff4646';
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.moveTo(b.x, top);
+        ctx.lineTo(b.x - 4, top + 9);
+        ctx.lineTo(b.x + 1, top + 18);
+        ctx.lineTo(b.x - 3, top + 28);
+        ctx.moveTo(b.x + w, top);
+        ctx.lineTo(b.x + w + 4, top + 9);
+        ctx.lineTo(b.x + w - 1, top + 18);
+        ctx.lineTo(b.x + w + 3, top + 28);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        // Warning lip across the opening
+        ctx.fillStyle = 'rgba(255, 70, 70, 0.55)';
+        ctx.fillRect(b.x, top - 2, w, 3);
+        // Down-chevrons hinting "gap"
+        ctx.fillStyle = '#ff4646';
+        for (let i = 0; i < 3; i++) {
+          const dx = b.x + w * (0.3 + i * 0.2);
+          ctx.beginPath();
+          ctx.moveTo(dx - 5, top + 12);
+          ctx.lineTo(dx + 5, top + 12);
+          ctx.lineTo(dx, top + 19);
+          ctx.closePath();
+          ctx.fill();
+        }
+        break;
+      }
       case 'flyingHouse': {
         // A rival house airlifted by rotors — sharp zig-zag up and down.
         const hx = b.x + 6;
@@ -507,6 +552,7 @@ export class ObstacleSpawner {
         SPECS[k].minTier <= tier &&
         k !== 'fud' &&
         k !== 'flyingHouse' &&
+        k !== 'pit' &&
         SPECS[k].clearance > 0 === wantHigh
     );
     if (kinds.length === 0) return null;

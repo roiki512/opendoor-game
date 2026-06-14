@@ -36,6 +36,11 @@ export class Player {
     this.invincibleTime = 0;
   }
 
+  /** True when the player is on the ground (would fall into a rug-pull pit). */
+  get onGround(): boolean {
+    return this.grounded;
+  }
+
   get width(): number {
     return this.ducking ? TUNING.duckWidth : TUNING.standWidth;
   }
