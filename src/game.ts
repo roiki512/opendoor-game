@@ -479,6 +479,18 @@ export class Game {
             p.collected = true;
           }
         }
+        // "Bait" boosters: occasionally a pill floats right over a ground enemy —
+        // tempting, but grabbing it means committing to a full jump by the hazard.
+        for (const o of this.spawner.obstacles) {
+          if (o.baitDone || o.x < TUNING.width + 50) continue;
+          o.baitDone = true;
+          if (
+            (o.kind === 'bear' || o.kind === 'wreckedHouse') &&
+            Math.random() < TUNING.baitChance
+          ) {
+            this.pickups.spawnBait(o.x);
+          }
+        }
 
         // Collisions. Obstacles are positioned against the player's own ground
         // height (they collide at the player's x anyway), so terrain bumps can

@@ -34,8 +34,9 @@ const SPECS: Record<ObstacleKind, KindSpec> = {
   crashChart: { w: 44, h: 86, clearance: 32, extraSpeed: 0, minTier: 1 },
   // Rival house — flies forward (extraSpeed) AND zig-zags vertically.
   flyingHouse: { w: 44, h: 30, clearance: 26, extraSpeed: 45, minTier: 1 },
-  // Bears charge in from the very start — fast, and sometimes in packs.
-  bear: { w: 44, h: 34, clearance: 0, extraSpeed: 55, minTier: 0 },
+  // Bears charge in from the very start — a bit fast (kept modest so they can
+  // combo with other obstacles fairly), and they always bring company.
+  bear: { w: 44, h: 34, clearance: 0, extraSpeed: 40, minTier: 0 },
 };
 
 // The bobbing FUD rides high so there's usually room to duck under it: clearance
@@ -60,6 +61,8 @@ export class Obstacle {
   kind: ObstacleKind;
   spin = Math.random() * Math.PI * 2;
   fleeing = false;
+  /** Whether a bait booster has already been considered for this obstacle. */
+  baitDone = false;
   /** Random phase so each FUD/rival's down-up rhythm is unpredictable. */
   private phase = Math.random() * Math.PI * 2;
 
@@ -423,14 +426,17 @@ export class ObstacleSpawner {
       let clusterChance = Math.min(0.8, TUNING.clusterChanceMax * difficulty + endless);
       if (surging) clusterChance = 0.97;
 
+      // Bears are never standalone — they always charge in alongside something.
+      const bearPrimary = primary.kind === 'bear';
+
       if (wasFirst) {
         // no combo on the very first obstacle
-      } else if (primary.kind === 'bear' && Math.random() < TUNING.bearPackChance) {
+      } else if (bearPrimary && Math.random() < TUNING.bearPackChance) {
         // A charging pack: 1-2 more bears in quick succession (all jumps).
         const extra = Math.random() < 0.4 ? 2 : 1;
         for (let i = 0; i < extra; i++) this.queue.push('bear');
         this.pendingIn = TUNING.clusterGap;
-      } else if (Math.random() < clusterChance) {
+      } else if (bearPrimary || Math.random() < clusterChance) {
         let wantHigh = !primary.isHigh; // first partner is the opposite action
         const p1 = this.pickPartner(tier, wantHigh);
         if (p1) {
@@ -484,20 +490,25 @@ export class ObstacleSpawner {
 
   /**
    * Pick a partner of the requested action category (high = duck, low = jump).
-   * Only steady-height, steady-speed kinds qualify so the combo's required
-   * actions stay predictable and fair: wreckedHouse (jump) and crashChart (duck).
+   * Steady-height kinds only (FUD/rival bob, so their action isn't predictable):
+   * jump = wreckedHouse or bear (weighted), duck = crashChart.
    */
   private pickPartner(tier: number, wantHigh: boolean): ObstacleKind | null {
     const kinds = (Object.keys(SPECS) as ObstacleKind[]).filter(
       (k) =>
         SPECS[k].minTier <= tier &&
-        SPECS[k].extraSpeed === 0 &&
         k !== 'fud' &&
         k !== 'flyingHouse' &&
         SPECS[k].clearance > 0 === wantHigh
     );
     if (kinds.length === 0) return null;
-    return kinds[Math.floor(Math.random() * kinds.length)];
+    const weights = kinds.map((k) => (k === 'bear' ? TUNING.bearWeight : 1));
+    let r = Math.random() * weights.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < kinds.length; i++) {
+      r -= weights[i];
+      if (r < 0) return kinds[i];
+    }
+    return kinds[kinds.length - 1];
   }
 }
 

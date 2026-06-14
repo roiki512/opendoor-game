@@ -179,6 +179,16 @@ export class PickupSpawner {
     this.nextSpawnIn = 5;
   }
 
+  /**
+   * Drop a tempting "bait" booster right at a ground enemy. It floats high
+   * enough that grabbing it needs a committed full jump near the hazard — risky.
+   */
+  spawnBait(x: number) {
+    const p = new Pickup(x, 'pill');
+    p.altitude = 62 + Math.random() * 18;
+    this.pickups.push(p);
+  }
+
   update(dt: number, scrollSpeed: number, allowSqueeze = true, wallXs: number[] = []) {
     for (const p of this.pickups) p.update(dt, scrollSpeed);
     this.pickups = this.pickups.filter((p) => p.x > -60 && !p.collected);
