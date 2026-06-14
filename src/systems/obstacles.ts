@@ -377,8 +377,17 @@ export class ObstacleSpawner {
    *   difficulty creep past the configured roster).
    * @param totalTiers number of milestones in the roster.
    */
-  update(dt: number, scrollSpeed: number, progress: number, totalTiers: number) {
+  update(
+    dt: number,
+    scrollSpeed: number,
+    progress: number,
+    totalTiers: number,
+    pickupXs: number[] = []
+  ) {
     if (this.surgeTime > 0) this.surgeTime -= dt;
+    // Don't drop a tall crash chart right where a booster already is.
+    const spawnX = TUNING.width + 80;
+    const blockWall = pickupXs.some((px) => Math.abs(px - spawnX) < TUNING.pickupWallClear);
 
     for (const o of this.obstacles) o.update(dt, scrollSpeed);
     this.obstacles = this.obstacles.filter(
@@ -405,7 +414,7 @@ export class ObstacleSpawner {
 
     this.nextSpawnIn -= dt;
     if (this.nextSpawnIn <= 0) {
-      const primary = this.spawnRandom(tier);
+      const primary = this.spawnRandom(tier, blockWall);
       const wasFirst = !this.firstSpawnDone;
       this.firstSpawnDone = true;
 
@@ -449,12 +458,21 @@ export class ObstacleSpawner {
     }
   }
 
-  /** Spawn a random unlocked obstacle and return it. */
-  private spawnRandom(tier: number): Obstacle {
+  /** Spawn a random unlocked obstacle (bears weighted heavier) and return it. */
+  private spawnRandom(tier: number, blockWall = false): Obstacle {
     const kinds = (Object.keys(SPECS) as ObstacleKind[]).filter(
-      (k) => SPECS[k].minTier <= tier
+      (k) => SPECS[k].minTier <= tier && !(blockWall && k === 'crashChart')
     );
-    const kind = kinds[Math.floor(Math.random() * kinds.length)];
+    const weights = kinds.map((k) => (k === 'bear' ? TUNING.bearWeight : 1));
+    let r = Math.random() * weights.reduce((a, b) => a + b, 0);
+    let kind = kinds[kinds.length - 1];
+    for (let i = 0; i < kinds.length; i++) {
+      r -= weights[i];
+      if (r < 0) {
+        kind = kinds[i];
+        break;
+      }
+    }
     return this.spawnKind(kind);
   }
 

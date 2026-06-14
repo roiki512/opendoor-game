@@ -463,9 +463,22 @@ export class Game {
           this.input.jumpHeld
         );
 
-        this.spawner.update(dt, scroll, this.nextMilestoneIdx, MILESTONES.length);
+        const pickupXs = this.pickups.pickups.map((p) => p.x);
+        this.spawner.update(dt, scroll, this.nextMilestoneIdx, MILESTONES.length, pickupXs);
+        // Keep boosters out of a tall crash chart's no-jump shadow (unreachable).
+        const wallXs = this.spawner.obstacles
+          .filter((o) => o.kind === 'crashChart')
+          .map((o) => o.x);
         // Short-squeeze shields only start dropping once you've passed $34.
-        this.pickups.update(dt, scroll, this.price.price >= 34);
+        this.pickups.update(dt, scroll, this.price.price >= 34, wallXs);
+        // Backstop: drop any booster that still lands beside a chart while it's
+        // still off the right edge (invisible to the player).
+        for (const p of this.pickups.pickups) {
+          if (p.collected || p.x < TUNING.width - 50) continue;
+          if (wallXs.some((xo) => Math.abs(xo - p.x) < TUNING.pickupWallClear)) {
+            p.collected = true;
+          }
+        }
 
         // Collisions. Obstacles are positioned against the player's own ground
         // height (they collide at the player's x anyway), so terrain bumps can

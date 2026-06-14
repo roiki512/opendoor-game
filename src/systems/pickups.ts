@@ -179,12 +179,19 @@ export class PickupSpawner {
     this.nextSpawnIn = 5;
   }
 
-  update(dt: number, scrollSpeed: number, allowSqueeze = true) {
+  update(dt: number, scrollSpeed: number, allowSqueeze = true, wallXs: number[] = []) {
     for (const p of this.pickups) p.update(dt, scrollSpeed);
     this.pickups = this.pickups.filter((p) => p.x > -60 && !p.collected);
 
     this.nextSpawnIn -= dt;
     if (this.nextSpawnIn <= 0) {
+      // A booster dropped into a tall crash chart's no-jump shadow is
+      // unreachable — wait for the chart to clear the spawn zone first.
+      const spawnX = TUNING.width + 60;
+      if (wallXs.some((xo) => Math.abs(xo - spawnX) < TUNING.pickupWallClear)) {
+        this.nextSpawnIn = 0.4;
+        return;
+      }
       // Pills are the common drop (they drive speed); rockets uncommon; the
       // short-squeeze shield is rare and only unlocks past $34.
       const r = Math.random();

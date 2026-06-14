@@ -52,7 +52,8 @@ export const TUNING = {
   // a duck, or jump-duck-jump) close behind. Drives the jump<->duck rhythm.
   clusterChanceMax: 0.6, // partner chance at full difficulty
   clusterGap: 0.75, // seconds between the pair (enough to land a jump, then duck)
-  bearPackChance: 0.4, // chance a bear charges in as a pack of 2-3
+  bearWeight: 1.9, // how much more often a spawn is a bear vs. another kind
+  bearPackChance: 0.45, // chance a bear charges in as a pack of 2-3
   startGrace: 2.4, // calm seconds at the start of a run before the first short
 
   // "EARNINGS DAY" volatility surges — periodic combo-dense bursts.
@@ -73,6 +74,7 @@ export const TUNING = {
   rocketBoostTime: 3.5, // seconds the rocket boost lasts
   pickupIntervalMin: 2.8, // seconds between pickup spawns (random in range)
   pickupIntervalMax: 5,
+  pickupWallClear: 185, // keep boosters this far (px) from a tall crash chart
 
   // Terrain / chart line
   groundBase: 0.74, // fraction of screen height where the chart line sits
