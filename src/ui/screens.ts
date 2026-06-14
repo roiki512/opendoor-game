@@ -193,13 +193,20 @@ function endingVariant(peak: number) {
   };
 }
 
-/** Share-on-X button on the game-over screen (left column). */
+/** Share-on-X + Try-again buttons on the game-over screen (left column). */
 export const SHARE_BUTTON: ButtonRect = {
-  x: W * 0.27 - 110,
-  y: H * 0.7,
-  w: 220,
+  x: W * 0.27 - 115,
+  y: H * 0.69,
+  w: 230,
   h: 42,
   label: '𝕏  SHARE YOUR RUN',
+};
+export const TRY_AGAIN_BUTTON: ButtonRect = {
+  x: W * 0.27 - 115,
+  y: H * 0.79,
+  w: 230,
+  h: 42,
+  label: '▶  TRY AGAIN',
 };
 
 export function drawGameOver(
@@ -246,32 +253,22 @@ export function drawGameOver(
     ctx.fillStyle = '#ffd84d';
     ctx.shadowColor = '#ffd84d';
     ctx.shadowBlur = 10;
-    ctx.fillText(`★ TOP ${highlightIndex + 1} OF ALL TIME ★`, lx, H * 0.66);
+    ctx.fillText(`★ TOP ${highlightIndex + 1} OF ALL TIME ★`, lx, H * 0.63);
     ctx.shadowBlur = 0;
   }
   ctx.textAlign = 'left';
 
-  // Share-on-X button (hidden while the name modal is up)
+  // Share-on-X + Try-again buttons (hidden while the name modal is up)
   if (!enteringName) {
-    const b = SHARE_BUTTON;
-    ctx.fillStyle = 'rgba(20, 32, 50, 0.92)';
-    ctx.fillRect(b.x, b.y, b.w, b.h);
-    ctx.strokeStyle = '#5fa8d8';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(b.x, b.y, b.w, b.h);
-    ctx.font = `bold 16px ${MONO}`;
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#c9d8ea';
-    ctx.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2 + 6);
-    ctx.textAlign = 'left';
+    drawButton(ctx, SHARE_BUTTON, 16);
+    drawButton(ctx, TRY_AGAIN_BUTTON, 16);
+    if (t > 0.8 && Math.floor(t * 1.6) % 2 === 0) {
+      centered(ctx, '(or press any key to try again)', H * 0.93, 12, 'rgba(150,190,230,0.7)', false, '');
+    }
   }
 
   // Right column: leaderboard
   drawLeaderboard(ctx, board, highlightIndex, W * 0.55, H * 0.14, global);
-
-  if (!enteringName && t > 0.8 && Math.floor(t * 1.6) % 2 === 0) {
-    centered(ctx, '— TAP OR PRESS ANY KEY TO BUY THE DIP —', H * 0.88, 16, '#f3eee4');
-  }
 }
 
 function drawLeaderboard(

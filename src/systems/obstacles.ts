@@ -32,8 +32,8 @@ const SPECS: Record<ObstacleKind, KindSpec> = {
   // A tall red crash-chart: its top sits above the jump apex (~112px) so it
   // can't be jumped — you must duck under the gap at its base. Anti jump-spam.
   crashChart: { w: 44, h: 86, clearance: 32, extraSpeed: 0, minTier: 1 },
-  // Rival house — sharp vertical zig-zag (clearance via effClearance).
-  flyingHouse: { w: 44, h: 30, clearance: 26, extraSpeed: 0, minTier: 1 },
+  // Rival house — flies forward (extraSpeed) AND zig-zags vertically.
+  flyingHouse: { w: 44, h: 30, clearance: 26, extraSpeed: 45, minTier: 1 },
   bear: { w: 44, h: 34, clearance: 0, extraSpeed: 55, minTier: 2 },
 };
 

@@ -18,6 +18,7 @@ import {
   drawHowTo,
   PAUSE_BUTTONS,
   SHARE_BUTTON,
+  TRY_AGAIN_BUTTON,
   TITLE_BUTTONS,
   BOARD_BACK_BUTTON,
   HOWTO_BACK_BUTTON,
@@ -168,9 +169,15 @@ export class Game {
       }
       return true; // swallow stray taps while the menu is open
     }
-    if (this.state === 'gameover' && !this.enteringName && hit(SHARE_BUTTON)) {
-      this.shareScore();
-      return true; // don't let the tap also restart the run
+    if (this.state === 'gameover' && !this.enteringName) {
+      if (hit(SHARE_BUTTON)) {
+        this.shareScore();
+        return true; // don't let the tap also restart the run
+      }
+      if (hit(TRY_AGAIN_BUTTON)) {
+        this.startRun();
+        return true;
+      }
     }
     return false;
   }
@@ -334,14 +341,27 @@ export class Game {
 
   private submitName() {
     if (!this.enteringName) return;
-    addEntry(this.nameInputEl.value, this.price.peak);
-    this.goToTitle();
+    const { index } = addEntry(this.nameInputEl.value, this.price.peak);
+    this.highlightIndex = index;
+    this.board = loadLeaderboard();
+    void refreshRemote().then(() => {
+      this.board = loadLeaderboard();
+    });
+    this.finishNameEntry();
   }
 
-  /** "RESTART" on the name modal: skip signing, back to the entry screen. */
+  /** "SKIP" on the name modal: don't record, but still offer Share / Try again. */
   private skipName() {
     if (!this.enteringName) return;
-    this.goToTitle();
+    this.finishNameEntry();
+  }
+
+  /** Close the name modal and return to the game-over screen (Share / Try again). */
+  private finishNameEntry() {
+    this.enteringName = false;
+    this.nameEntryEl.classList.remove('visible');
+    this.stateTime = 0; // restart the gameover prompt timing / restart delay
+    this.input.clear();
   }
 
   /**
@@ -446,11 +466,14 @@ export class Game {
         this.spawner.update(dt, scroll, this.nextMilestoneIdx, MILESTONES.length);
         this.pickups.update(dt, scroll);
 
-        // Collisions
+        // Collisions. Obstacles are positioned against the player's own ground
+        // height (they collide at the player's x anyway), so terrain bumps can
+        // never shrink a duck gap below what a ducking player can clear.
         const pbox = this.player.hitbox();
+        const collideGround = this.chart.groundAt(this.player.x);
         for (const o of this.spawner.obstacles) {
           if (o.fleeing) continue;
-          if (boxesOverlap(pbox, o.hitbox(this.chart.groundAt(o.x)))) {
+          if (boxesOverlap(pbox, o.hitbox(collideGround))) {
             this.takeHit();
             break;
           }
