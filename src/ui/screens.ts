@@ -119,31 +119,11 @@ export function drawHowTo(ctx: CanvasRenderingContext2D) {
   infoLine(ctx, 'On phone: on-screen JUMP / DUCK buttons', lx, 272);
   infoLine(ctx, 'Pause   Esc / P', lx, 296);
 
-  sectionHead(ctx, 'POWER-UPS', lx, 322);
-  spriteRow(
-    ctx,
-    (x, y) => drawPickupIcon(ctx, 'pill', x, y, 0.9),
-    'AI PILL — collect 3 to go FASTER',
-    lx + 16,
-    lx + 40,
-    352
-  );
-  spriteRow(
-    ctx,
-    (x, y) => drawPickupIcon(ctx, 'squeeze', x, y, 0.9),
-    'SHORT SQUEEZE — shield, blocks a hit (rare)',
-    lx + 16,
-    lx + 40,
-    390
-  );
-  spriteRow(
-    ctx,
-    (x, y) => drawPickupIcon(ctx, 'rocket', x, y, 0.9),
-    'ROCKET — speed burst',
-    lx + 16,
-    lx + 40,
-    428
-  );
+  sectionHead(ctx, 'POWER-UPS', lx, 320);
+  spriteRow(ctx, (x, y) => drawPickupIcon(ctx, 'pill', x, y, 0.9), 'AI PILL — collect 3 to go FASTER', lx + 16, lx + 40, 346);
+  spriteRow(ctx, (x, y) => drawPickupIcon(ctx, 'magnet', x, y, 0.9), 'MAGNET — pulls in nearby pills', lx + 16, lx + 40, 378);
+  spriteRow(ctx, (x, y) => drawPickupIcon(ctx, 'squeeze', x, y, 0.9), 'SHORT SQUEEZE — shield, blocks a hit (rare)', lx + 16, lx + 40, 410);
+  spriteRow(ctx, (x, y) => drawPickupIcon(ctx, 'rocket', x, y, 0.9), 'ROCKET — speed burst', lx + 16, lx + 40, 442);
 
   // Right column: the shorts' obstacles
   const rx = 520;

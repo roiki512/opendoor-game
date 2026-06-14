@@ -75,7 +75,11 @@ export const TUNING = {
   // Collectible pickups
   pickupPriceBoost: 1.03, // AI pill: small instant price nudge on top of speed
   squeezeChance: 0.1, // chance a spawned pickup is the rare short-squeeze shield
-  rocketChance: 0.16, // chance a spawned pickup is a rocket (after squeeze roll)
+  magnetChance: 0.1, // chance a spawned pickup is a magnet
+  magnetTime: 5, // seconds the magnet pulls in nearby pills
+  magnetRange: 430, // px ahead the magnet reaches
+  magnetPull: 620, // extra px/s it drags pickups toward you
+  rocketChance: 0.15, // chance a spawned pickup is a rocket (after squeeze roll)
   rocketBoostMult: 1.4, // rocket: extra speed/climb multiplier while active
   rocketBoostTime: 3.5, // seconds the rocket boost lasts
   pickupIntervalMin: 2.8, // seconds between pickup spawns (random in range)

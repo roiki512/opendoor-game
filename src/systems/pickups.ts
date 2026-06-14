@@ -5,14 +5,16 @@ import type { Box } from './player';
 //  - 'pill'    ("AI pill" capsule) -> collect 3 to go one step FASTER
 //  - 'rocket'  (🚀, uncommon)      -> short speed burst
 //  - 'squeeze' (short squeeze, rare) -> a shield that absorbs one hit
+//  - 'magnet'  (uncommon)          -> briefly sucks in nearby pills
 // They float at jump height so you grab them mid-air — risk vs. reward.
 
-export type PickupKind = 'rocket' | 'pill' | 'squeeze';
+export type PickupKind = 'rocket' | 'pill' | 'squeeze' | 'magnet';
 
 const ROCKET_SIZE = 26;
 const PILL_W = 34;
 const PILL_H = 18;
 const SQUEEZE_SIZE = 28;
+const MAGNET_SIZE = 26;
 
 export class Pickup {
   x: number;
@@ -36,8 +38,9 @@ export class Pickup {
 
   hitbox(groundY: number): Box {
     const bob = Math.sin(this.spin) * 4;
-    const w = this.kind === 'rocket' ? ROCKET_SIZE : this.kind === 'squeeze' ? SQUEEZE_SIZE : PILL_W;
-    const h = this.kind === 'rocket' ? ROCKET_SIZE : this.kind === 'squeeze' ? SQUEEZE_SIZE : PILL_H;
+    const big = this.kind === 'rocket' ? ROCKET_SIZE : this.kind === 'squeeze' ? SQUEEZE_SIZE : this.kind === 'magnet' ? MAGNET_SIZE : 0;
+    const w = big || PILL_W;
+    const h = big || PILL_H;
     // Generous grab box — picking up should feel easy
     return {
       x: this.x - w / 2 - 6,
@@ -55,7 +58,34 @@ export class Pickup {
     ctx.save();
     ctx.translate(cx, cy);
 
-    if (this.kind === 'squeeze') {
+    if (this.kind === 'magnet') {
+      // A red horseshoe magnet with silver poles, opening downward.
+      const s = MAGNET_SIZE;
+      ctx.shadowColor = '#39c2ff';
+      ctx.shadowBlur = 12;
+      ctx.lineWidth = s * 0.3;
+      ctx.lineCap = 'butt';
+      // Red U body (arc on top, legs down)
+      ctx.strokeStyle = '#d23030';
+      ctx.beginPath();
+      ctx.arc(0, 0, s * 0.32, Math.PI, 0);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.32, 0);
+      ctx.lineTo(-s * 0.32, s * 0.34);
+      ctx.moveTo(s * 0.32, 0);
+      ctx.lineTo(s * 0.32, s * 0.34);
+      ctx.stroke();
+      // Silver pole tips
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#d2d8e0';
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.32, s * 0.34);
+      ctx.lineTo(-s * 0.32, s * 0.5);
+      ctx.moveTo(s * 0.32, s * 0.34);
+      ctx.lineTo(s * 0.32, s * 0.5);
+      ctx.stroke();
+    } else if (this.kind === 'squeeze') {
       // "Short squeeze" — a glowing shield (the only source of a shield now).
       const s = SQUEEZE_SIZE;
       ctx.shadowColor = '#50dcff';
@@ -202,12 +232,14 @@ export class PickupSpawner {
         this.nextSpawnIn = 0.4;
         return;
       }
-      // Pills are the common drop (they drive speed); rockets uncommon; the
-      // short-squeeze shield is rare and only unlocks past $34.
+      // Pills are the common drop (they drive speed); magnet/rocket uncommon;
+      // the short-squeeze shield is rare and only unlocks past $34.
       const r = Math.random();
       let kind: PickupKind = 'pill';
-      if (allowSqueeze && r < TUNING.squeezeChance) kind = 'squeeze';
-      else if (r < TUNING.squeezeChance + TUNING.rocketChance) kind = 'rocket';
+      let t = 0;
+      if (allowSqueeze && r < (t += TUNING.squeezeChance)) kind = 'squeeze';
+      else if (r < (t += TUNING.magnetChance)) kind = 'magnet';
+      else if (r < (t += TUNING.rocketChance)) kind = 'rocket';
       this.pickups.push(new Pickup(TUNING.width + 60, kind));
       this.nextSpawnIn =
         TUNING.pickupIntervalMin +

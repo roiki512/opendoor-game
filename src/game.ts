@@ -71,6 +71,8 @@ export class Game {
   private viewingHowTo = false;
   /** Seconds left on a collected rocket's speed boost. */
   private rocketTime = 0;
+  /** Seconds left on a magnet's pull. */
+  private magnetTime = 0;
   /** Countdown to the next EARNINGS DAY volatility surge. */
   private surgeTimer: number = TUNING.surgeFirst;
 
@@ -247,6 +249,7 @@ export class Game {
     this.shake = 0;
     this.paused = false;
     this.rocketTime = 0;
+    this.magnetTime = 0;
     this.surgeTimer = TUNING.surgeFirst;
     this.highlightIndex = -1;
     this.enteringName = false;
@@ -430,6 +433,7 @@ export class Game {
         }
         this.runTime += dt;
         this.rocketTime = Math.max(0, this.rocketTime - dt);
+        this.magnetTime = Math.max(0, this.magnetTime - dt);
         this.hitSlowTime = Math.max(0, this.hitSlowTime - dt);
         this.player.boosting = this.rocketTime > 0;
 
@@ -508,6 +512,18 @@ export class Game {
         }
         if (this.state !== 'playing') break; // the last hit ends the run
 
+        // Magnet: drag nearby boosters in and line them up with the player.
+        if (this.magnetTime > 0) {
+          for (const p of this.pickups.pickups) {
+            if (p.collected) continue;
+            const dx = p.x - this.player.x;
+            if (dx > 0 && dx < TUNING.magnetRange) {
+              p.x -= TUNING.magnetPull * dt;
+              p.altitude += (30 - p.altitude) * Math.min(1, 5 * dt);
+            }
+          }
+        }
+
         for (const p of this.pickups.pickups) {
           if (boxesOverlap(pbox, p.hitbox(this.chart.groundAt(p.x)))) {
             p.collected = true;
@@ -522,6 +538,10 @@ export class Game {
               this.player.shieldTime = TUNING.shieldDuration;
               this.sound.shieldBlock();
               this.particles.floatText(p.x, py - 90, '🛡 SHORT SQUEEZE!', '#50dcff');
+            } else if (p.kind === 'magnet') {
+              this.magnetTime = TUNING.magnetTime;
+              this.sound.boostPickup();
+              this.particles.floatText(p.x, py - 90, '🧲 MAGNET!', '#39c2ff');
             } else {
               // AI pill: a small price nudge, and every few pills steps up speed.
               const gained = this.price.bump(TUNING.pickupPriceBoost);
