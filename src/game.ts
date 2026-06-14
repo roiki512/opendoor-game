@@ -52,6 +52,8 @@ export class Game {
 
   private lives = TUNING.maxLives;
   private speedMultiplier = 1;
+  /** AI pills collected this run — every few steps the speed up. */
+  private pillCount = 0;
   /** Seconds left on the temporary slowdown from the last hit. */
   private hitSlowTime = 0;
   private nextMilestoneIdx = 0;
@@ -229,6 +231,7 @@ export class Game {
     this.particles.clear();
     this.lives = TUNING.maxLives;
     this.speedMultiplier = 1;
+    this.pillCount = 0;
     this.hitSlowTime = 0;
     this.nextMilestoneIdx = 0;
     this.runTime = 0;
@@ -366,7 +369,8 @@ export class Game {
     while (this.price.price >= m.price) {
       this.nextMilestoneIdx++;
 
-      this.speedMultiplier *= m.boost;
+      // Milestones are price achievements now — speed comes from AI pills, not
+      // from milestones. They still celebrate and the $8 upgrade / $82 ATH fire.
       this.tint = m.tint;
       this.tintStrength = 1;
       this.banner = { milestone: m, t: 0 };
@@ -374,14 +378,8 @@ export class Game {
       this.particles.confettiBurst(this.player.x, this.player.feetY - 40, 50);
 
       switch (m.effect) {
-        case 'shield':
-          this.player.shieldTime = TUNING.shieldDuration;
-          break;
         case 'upgrade':
           this.player.upgraded = true;
-          break;
-        case 'squeeze':
-          this.spawner.startSqueeze();
           break;
         case 'ath':
           // Breaking the all-time high deserves the full fanfare — and then
@@ -468,10 +466,23 @@ export class Game {
               this.rocketTime = TUNING.rocketBoostTime;
               this.sound.pickup();
               this.particles.floatText(p.x, py - 90, '🚀 FASTER!', '#ffb13d');
+            } else if (p.kind === 'squeeze') {
+              // Short squeeze = the only shield in the game now.
+              this.player.shieldTime = TUNING.shieldDuration;
+              this.sound.shieldBlock();
+              this.particles.floatText(p.x, py - 90, '🛡 SHORT SQUEEZE!', '#50dcff');
             } else {
+              // AI pill: a small price nudge, and every few pills steps up speed.
               const gained = this.price.bump(TUNING.pickupPriceBoost);
-              this.sound.boostPickup();
-              this.particles.floatText(p.x, py - 90, `+$${gained.toFixed(2)}`, '#39c2ff');
+              this.pillCount++;
+              if (this.pillCount % TUNING.pillsPerSpeedUp === 0) {
+                this.speedMultiplier *= TUNING.pillSpeedStep;
+                this.sound.milestone();
+                this.particles.floatText(p.x, py - 90, '⚡ FASTER!', '#ffd84d');
+              } else {
+                this.sound.boostPickup();
+                this.particles.floatText(p.x, py - 90, `+$${gained.toFixed(2)}`, '#39c2ff');
+              }
             }
             this.particles.confettiBurst(p.x, py - 60, 14);
           }
@@ -527,6 +538,8 @@ export class Game {
         lives: this.lives,
         speedMultiplier: this.speedMultiplier * this.rocketFactor * this.hitSlowFactor,
         momentum: this.price.momentum,
+        pillProgress: this.pillCount % TUNING.pillsPerSpeedUp,
+        pillsPerStep: TUNING.pillsPerSpeedUp,
         nextMilestone: this.milestoneAt(this.nextMilestoneIdx),
         muted: this.sound.muted,
         crashing: this.chart.crashing,

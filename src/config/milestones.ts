@@ -48,7 +48,7 @@ export const MILESTONES: Milestone[] = [
     name: 'KAZ',
     tagline: 'A new CEO walks through the open door',
     boost: 1.18,
-    effect: 'shield',
+    effect: 'none',
     tint: '#39c2ff',
   },
   {
@@ -72,15 +72,15 @@ export const MILESTONES: Milestone[] = [
     name: 'AI MORTGAGE PRODUCT NATIONWIDE',
     tagline: 'Approved in all 50 states, instantly',
     boost: 1.16,
-    effect: 'shield',
+    effect: 'none',
     tint: '#39c2ff',
   },
   {
     price: 34,
-    name: 'SHORT SQUEEZE',
-    tagline: 'The shorts run for the exits',
+    name: 'CASH OFFERS NATIONWIDE',
+    tagline: 'Instant offers in every zip code',
     boost: 1.15,
-    effect: 'squeeze',
+    effect: 'none',
     tint: '#ffb13d',
   },
   {
@@ -88,7 +88,7 @@ export const MILESTONES: Milestone[] = [
     name: 'S&P 500 INCLUSION',
     tagline: 'Welcome to the index',
     boost: 1.15,
-    effect: 'shield',
+    effect: 'none',
     tint: '#ffd84d',
   },
   {
@@ -138,7 +138,7 @@ export const POST_ATH_MILESTONES: Omit<Milestone, 'price'>[] = [
     name: 'SHORTS FULLY LIQUIDATED',
     tagline: 'The last bear leaves the building',
     boost: 1.1,
-    effect: 'squeeze',
+    effect: 'none',
     tint: '#ffb13d',
   },
   {
@@ -159,14 +159,14 @@ export const POST_ATH_MILESTONES: Omit<Milestone, 'price'>[] = [
     name: 'THE HOUSING SINGULARITY',
     tagline: 'Homes now buy and sell themselves',
     boost: 1.09,
-    effect: 'shield',
+    effect: 'none',
     tint: '#7a6bff',
   },
   {
     name: 'OPENDOOR BUYS THE MOON',
     tagline: 'Lunar listings, instant offers 🌕',
     boost: 1.1,
-    effect: 'squeeze',
+    effect: 'none',
     tint: '#ffd84d',
   },
   {

@@ -10,6 +10,9 @@ export interface HudState {
   lives: number;
   speedMultiplier: number;
   momentum: number;
+  /** AI pills collected toward the next speed step (0..pillsPerStep). */
+  pillProgress: number;
+  pillsPerStep: number;
   nextMilestone: Milestone | null;
   muted: boolean;
   crashing: boolean;
@@ -95,8 +98,21 @@ export function drawHud(ctx: CanvasRenderingContext2D, s: HudState) {
   //      JUMP/DUCK buttons that sit in the bottom corners on touch devices) ----
   const cx = W / 2;
   const barW = 150;
-  const speedText = `FASTER ×${s.speedMultiplier.toFixed(2)}`;
+  // AI-pill progress toward the next FASTER step
+  const pipGap = 15;
+  const pipStart = cx - ((s.pillsPerStep - 1) * pipGap) / 2;
+  for (let i = 0; i < s.pillsPerStep; i++) {
+    ctx.beginPath();
+    ctx.arc(pipStart + i * pipGap, TUNING.height - 64, 4, 0, Math.PI * 2);
+    ctx.fillStyle = i < s.pillProgress ? '#39c2ff' : 'rgba(120, 150, 180, 0.3)';
+    ctx.fill();
+  }
+  ctx.font = `8px ${MONO}`;
+  ctx.fillStyle = 'rgba(150, 190, 230, 0.65)';
   ctx.textAlign = 'center';
+  ctx.fillText('AI PILLS → FASTER', cx, TUNING.height - 73);
+
+  const speedText = `FASTER ×${s.speedMultiplier.toFixed(2)}`;
   ctx.font = `bold 16px ${MONO}`;
   ctx.fillStyle = '#ffb13d';
   ctx.fillText(speedText, cx, TUNING.height - 44);

@@ -46,19 +46,13 @@ export const TUNING = {
   spawnIntervalStart: 1.9, // average seconds between obstacles at game start
   spawnIntervalMin: 0.78, // floor at max difficulty
   spawnJitter: 0.55, // +/- randomness fraction of the interval
-  squeezeDuration: 4.5, // seconds obstacles flee/stop spawning (squeeze effect)
-  shieldDuration: 10, // milestone shield: absorbs one hit or expires
+  shieldDuration: 10, // shield (short-squeeze item): absorbs one hit or expires
 
-  // Cluster combos — at higher difficulty an obstacle sometimes brings a
-  // complementary partner (a jump then a duck, or vice versa) close behind.
-  clusterChanceMax: 0.45, // partner chance at full difficulty
+  // Cluster combos — an obstacle often brings a complementary partner (jump then
+  // a duck, or jump-duck-jump) close behind. Drives the jump<->duck rhythm.
+  clusterChanceMax: 0.6, // partner chance at full difficulty
   clusterGap: 0.75, // seconds between the pair (enough to land a jump, then duck)
   startGrace: 2.4, // calm seconds at the start of a run before the first short
-
-  // FUD headlines that drop from the sky on their own timer.
-  fudFirst: 6, // seconds before the first one falls
-  fudIntervalMin: 3.5,
-  fudIntervalMax: 7,
 
   // "EARNINGS DAY" volatility surges — periodic combo-dense bursts.
   surgeDuration: 5, // seconds a surge lasts
@@ -66,13 +60,18 @@ export const TUNING = {
   surgeInterval: 22, // seconds between surges
   surgeIntervalJitter: 6, // +/- randomness on the gap
 
+  // Speed comes from collecting AI pills (no longer automatic at milestones).
+  pillsPerSpeedUp: 3, // AI pills needed to step the speed up once
+  pillSpeedStep: 1.2, // speed multiplier gained per step
+
   // Collectible pickups
-  pickupPriceBoost: 1.06, // Opendoor logo: instant +6% on the price
-  rocketChance: 0.3, // chance a spawned pickup is the rare rocket
+  pickupPriceBoost: 1.03, // AI pill: small instant price nudge on top of speed
+  squeezeChance: 0.1, // chance a spawned pickup is the rare short-squeeze shield
+  rocketChance: 0.16, // chance a spawned pickup is a rocket (after squeeze roll)
   rocketBoostMult: 1.4, // rocket: extra speed/climb multiplier while active
   rocketBoostTime: 3.5, // seconds the rocket boost lasts
-  pickupIntervalMin: 7, // seconds between pickup spawns (random in range)
-  pickupIntervalMax: 14,
+  pickupIntervalMin: 2.8, // seconds between pickup spawns (random in range)
+  pickupIntervalMax: 5,
 
   // Terrain / chart line
   groundBase: 0.74, // fraction of screen height where the chart line sits

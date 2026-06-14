@@ -4,15 +4,13 @@ import type { Box } from './player';
 // The shorts' arsenal — each enemy plays differently:
 //  - 'wreckedHouse'  ground, static            -> JUMP
 //  - 'bear'          ground, charges in fast   -> JUMP
-//  - 'chart'         red chart, bobs down/up   -> JUMP it low, slip UNDER it high
-//  - 'door'          tall red closed door      -> can't be jumped, DUCK under
-//  - 'paper' (FUD)   drops from the sky, lands -> JUMP the fallen headline
+//  - 'fud'           FUD report, bobs down/up  -> JUMP it low, slip UNDER it high
+//  - 'crashChart'    tall red chart, static    -> too tall to jump, DUCK under
 //  - 'flyingHouse'   rival, sharp zig-zag      -> JUMP it low, DUCK it high
 export type ObstacleKind =
   | 'wreckedHouse'
-  | 'chart'
-  | 'door'
-  | 'paper'
+  | 'fud'
+  | 'crashChart'
   | 'flyingHouse'
   | 'bear';
 
@@ -29,30 +27,24 @@ interface KindSpec {
 
 const SPECS: Record<ObstacleKind, KindSpec> = {
   wreckedHouse: { w: 38, h: 36, clearance: 0, extraSpeed: 0, minTier: 0 },
-  // A red chart that bobs down and up (clearance via effClearance).
-  chart: { w: 42, h: 20, clearance: 0, extraSpeed: 0, minTier: 0 },
-  // A tall "closed door": its top sits above the jump apex (~112px) so it can't
-  // be jumped — you must duck under the gap at its base. Punishes jump-spam.
-  door: { w: 40, h: 86, clearance: 32, extraSpeed: 0, minTier: 1 },
-  // FUD headline — drops from the sky (handled by the spawner's own timer).
-  paper: { w: 42, h: 28, clearance: 0, extraSpeed: 0, minTier: 1 },
+  // A FUD headline that bobs down and up (clearance via effClearance).
+  fud: { w: 40, h: 26, clearance: 0, extraSpeed: 0, minTier: 0 },
+  // A tall red crash-chart: its top sits above the jump apex (~112px) so it
+  // can't be jumped — you must duck under the gap at its base. Anti jump-spam.
+  crashChart: { w: 44, h: 86, clearance: 32, extraSpeed: 0, minTier: 1 },
   // Rival house — sharp vertical zig-zag (clearance via effClearance).
   flyingHouse: { w: 44, h: 30, clearance: 26, extraSpeed: 0, minTier: 1 },
   bear: { w: 44, h: 34, clearance: 0, extraSpeed: 55, minTier: 2 },
 };
 
-// The bobbing chart: clearance oscillates ~2 (on the deck) .. ~50 (overhead).
-const CHART_BASE = 26;
-const CHART_AMP = 24;
-const CHART_FREQ = 0.018;
-// The rival's zig-zag: clearly low (jump) .. clearly high (duck) so the read is
-// obvious. Uses a sharp triangle wave.
+// The bobbing FUD: clearance oscillates ~2 (on the deck) .. ~50 (overhead).
+const FUD_BASE = 26;
+const FUD_AMP = 24;
+const FUD_FREQ = 0.018;
+// The rival's zig-zag: clearly low (jump) .. clearly high (duck). Triangle wave.
 const ZIG_BASE = 26;
 const ZIG_AMP = 24;
 const ZIG_FREQ = 0.014;
-// FUD drop physics.
-const FUD_GRAVITY = 3200;
-const FUD_START_CLEAR = 210;
 
 /** Sharp triangle wave: period 2π, range [-1, 1]. */
 function triWave(t: number): number {
@@ -66,35 +58,25 @@ export class Obstacle {
   kind: ObstacleKind;
   spin = Math.random() * Math.PI * 2;
   fleeing = false;
-  /** Random phase so each chart/rival's down-up rhythm is unpredictable. */
+  /** Random phase so each FUD/rival's down-up rhythm is unpredictable. */
   private phase = Math.random() * Math.PI * 2;
-  /** FUD only: still falling from the sky. */
-  private falling = false;
-  private fallClear = 0;
-  private fallVy = 0;
 
   constructor(kind: ObstacleKind, x: number) {
     this.kind = kind;
     this.x = x;
-    if (kind === 'paper') {
-      this.falling = true;
-      this.fallClear = FUD_START_CLEAR;
-    }
   }
 
   get spec(): KindSpec {
     return SPECS[this.kind];
   }
 
-  /** Bottom-edge clearance. Chart/rival oscillate; FUD falls. */
+  /** Bottom-edge clearance. FUD bobs; rival zig-zags. */
   get effClearance(): number {
     switch (this.kind) {
-      case 'chart':
-        return CHART_BASE + Math.sin(this.x * CHART_FREQ + this.phase) * CHART_AMP;
+      case 'fud':
+        return FUD_BASE + Math.sin(this.x * FUD_FREQ + this.phase) * FUD_AMP;
       case 'flyingHouse':
         return ZIG_BASE + triWave(this.x * ZIG_FREQ + this.phase) * ZIG_AMP;
-      case 'paper':
-        return this.fallClear;
       default:
         return SPECS[this.kind].clearance;
     }
@@ -107,15 +89,7 @@ export class Obstacle {
   update(dt: number, scrollSpeed: number) {
     const flee = this.fleeing ? -2.2 : 1; // squeeze: run back off-screen right
     this.x -= (scrollSpeed + this.spec.extraSpeed) * flee * dt;
-    this.spin += dt * (this.kind === 'paper' && !this.falling ? 1 : this.kind === 'paper' ? 6 : 2);
-    if (this.falling) {
-      this.fallVy += FUD_GRAVITY * dt;
-      this.fallClear -= this.fallVy * dt;
-      if (this.fallClear <= 0) {
-        this.fallClear = 0;
-        this.falling = false;
-      }
-    }
+    this.spin += dt * (this.kind === 'fud' ? 4 : 2);
   }
 
   /** AABB in screen space; groundY sampled at the obstacle's x. */
@@ -193,20 +167,38 @@ export class Obstacle {
         ctx.stroke();
         break;
       }
-      case 'chart': {
-        // A small red declining chart that bobs down and up.
+      case 'fud': {
+        // A FUD headline (newspaper) tumbling along at bob height.
+        ctx.translate(cx, cy);
+        ctx.rotate(Math.sin(this.spin) * 0.4);
+        ctx.fillStyle = '#e8e4da';
+        ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
+        ctx.strokeStyle = '#6b6f78';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(-b.w / 2, -b.h / 2, b.w, b.h);
+        ctx.fillStyle = '#b03030';
+        ctx.font = 'bold 11px "Courier New", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('FUD', 0, -2);
+        ctx.fillStyle = '#9aa0ab';
+        ctx.fillRect(-b.w / 2 + 4, 4, b.w - 8, 2);
+        ctx.fillRect(-b.w / 2 + 4, 9, b.w - 8, 2);
+        break;
+      }
+      case 'crashChart': {
+        // A tall red crashing chart you can't jump — duck under it.
         ctx.fillStyle = 'rgba(20, 8, 10, 0.85)';
         ctx.fillRect(b.x, b.y, b.w, b.h);
         ctx.strokeStyle = '#ff4646';
         ctx.lineWidth = 1.5;
         ctx.strokeRect(b.x, b.y, b.w, b.h);
         const pts: [number, number][] = [
-          [0.08, 0.16],
-          [0.32, 0.4],
-          [0.46, 0.28],
-          [0.68, 0.62],
-          [0.8, 0.5],
-          [0.92, 0.88],
+          [0.08, 0.1],
+          [0.32, 0.32],
+          [0.46, 0.22],
+          [0.68, 0.58],
+          [0.8, 0.46],
+          [0.92, 0.9],
         ];
         ctx.strokeStyle = '#ff4646';
         ctx.lineWidth = 2.5;
@@ -220,7 +212,7 @@ export class Obstacle {
         ctx.stroke();
         ctx.shadowBlur = 0;
         const ex = b.x + 0.92 * b.w;
-        const ey = b.y + 0.88 * b.h;
+        const ey = b.y + 0.9 * b.h;
         ctx.fillStyle = '#ff4646';
         ctx.beginPath();
         ctx.moveTo(ex + 2, ey + 2);
@@ -228,55 +220,6 @@ export class Obstacle {
         ctx.lineTo(ex, ey - 7);
         ctx.closePath();
         ctx.fill();
-        break;
-      }
-      case 'door': {
-        // A red "closed door" — the anti-Opendoor. Too tall to jump; slide
-        // (duck) under the gap at its base. Drawn as a red shutter coming down.
-        ctx.fillStyle = '#7c1620';
-        ctx.fillRect(b.x - 3, b.y, b.w + 6, b.h);
-        ctx.fillStyle = '#c62836';
-        ctx.fillRect(b.x, b.y, b.w, b.h);
-        ctx.strokeStyle = '#5a0f17';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(b.x, b.y, b.w, b.h);
-        // Horizontal slats (shutter look)
-        ctx.strokeStyle = '#8c1a26';
-        ctx.lineWidth = 2;
-        const slats = 7;
-        for (let i = 1; i < slats; i++) {
-          const yy = b.y + (b.h / slats) * i;
-          ctx.beginPath();
-          ctx.moveTo(b.x + 2, yy);
-          ctx.lineTo(b.x + b.w - 2, yy);
-          ctx.stroke();
-        }
-        // Bottom lip + handle — the edge you duck beneath
-        ctx.fillStyle = '#5a0f17';
-        ctx.fillRect(b.x - 3, b.y + b.h - 6, b.w + 6, 6);
-        ctx.fillStyle = '#ffd84d';
-        ctx.fillRect(cx - 6, b.y + b.h - 13, 12, 4);
-        // A small red NO-ENTRY bar up top for "closed"
-        ctx.fillStyle = '#f3eee4';
-        ctx.fillRect(b.x + b.w * 0.2, b.y + b.h * 0.28, b.w * 0.6, b.h * 0.06);
-        break;
-      }
-      case 'paper': {
-        // FUD headline — tumbles as it drops, then flutters where it landed.
-        ctx.translate(cx, cy);
-        ctx.rotate(Math.sin(this.spin) * 0.5);
-        ctx.fillStyle = '#e8e4da';
-        ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
-        ctx.strokeStyle = '#6b6f78';
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(-b.w / 2, -b.h / 2, b.w, b.h);
-        ctx.fillStyle = '#b03030';
-        ctx.font = 'bold 11px "Courier New", monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('FUD', 0, -2);
-        ctx.fillStyle = '#9aa0ab';
-        ctx.fillRect(-b.w / 2 + 4, 4, b.w - 8, 2);
-        ctx.fillRect(-b.w / 2 + 4, 9, b.w - 8, 2);
         break;
       }
       case 'bear': {
@@ -410,9 +353,6 @@ export class ObstacleSpawner {
   /** Partners queued behind the last spawn (cluster / triple combo). */
   private queue: ObstacleKind[] = [];
   private pendingIn = 0;
-  /** Independent timer for FUD headlines raining from the sky. */
-  private fudTimer: number = TUNING.fudFirst;
-  squeezeTime = 0;
   /** EARNINGS DAY volatility burst — combo-heavy while it lasts. */
   surgeTime = 0;
 
@@ -422,21 +362,12 @@ export class ObstacleSpawner {
     this.firstSpawnDone = false;
     this.queue = [];
     this.pendingIn = 0;
-    this.fudTimer = TUNING.fudFirst;
-    this.squeezeTime = 0;
     this.surgeTime = 0;
-  }
-
-  startSqueeze() {
-    this.squeezeTime = TUNING.squeezeDuration;
-    this.queue = [];
-    this.pendingIn = 0;
-    for (const o of this.obstacles) o.fleeing = true;
   }
 
   /** Kick off an EARNINGS DAY surge (a short, combo-dense burst). */
   startSurge() {
-    if (this.squeezeTime <= 0) this.surgeTime = TUNING.surgeDuration;
+    this.surgeTime = TUNING.surgeDuration;
   }
 
   /**
@@ -445,15 +376,12 @@ export class ObstacleSpawner {
    * @param totalTiers number of milestones in the roster.
    */
   update(dt: number, scrollSpeed: number, progress: number, totalTiers: number) {
-    if (this.squeezeTime > 0) this.squeezeTime -= dt;
     if (this.surgeTime > 0) this.surgeTime -= dt;
 
     for (const o of this.obstacles) o.update(dt, scrollSpeed);
     this.obstacles = this.obstacles.filter(
       (o) => o.x > -80 && o.x < TUNING.width + 600
     );
-
-    if (this.squeezeTime > 0) return; // no spawns during the squeeze
 
     const tier = Math.min(progress, totalTiers); // which kinds are unlocked
     // Ramp to full difficulty by ~60% of the roster, so the climb to $82 is a
@@ -462,19 +390,6 @@ export class ObstacleSpawner {
     // Past the roster, keep creeping difficulty up so endless mode stays tense.
     const endless = Math.min(0.5, Math.max(0, progress - totalTiers) * 0.04);
     const surging = this.surgeTime > 0;
-
-    // FUD headlines rain from the sky on their own timer, landing ahead of the
-    // player (random spot, random time) as a ground obstacle to jump.
-    if (progress >= 1) {
-      this.fudTimer -= dt;
-      if (this.fudTimer <= 0) {
-        const x = TUNING.width * 0.72 + Math.random() * (TUNING.width * 0.28 + 30);
-        this.obstacles.push(new Obstacle('paper', x));
-        this.fudTimer =
-          TUNING.fudIntervalMin +
-          Math.random() * (TUNING.fudIntervalMax - TUNING.fudIntervalMin);
-      }
-    }
 
     // Release queued cluster partners first; hold the main timer until they're out.
     if (this.queue.length > 0) {
@@ -492,11 +407,10 @@ export class ObstacleSpawner {
       const wasFirst = !this.firstSpawnDone;
       this.firstSpawnDone = true;
 
-      // Maybe bring complementary partner(s) -> jump<->duck combos. Surges are
-      // almost always combos; difficulty/endless push it up otherwise. The very
-      // first obstacle of a run never clusters.
-      let clusterChance = Math.min(0.72, TUNING.clusterChanceMax * difficulty + endless);
-      if (surging) clusterChance = 0.95;
+      // Bring complementary partner(s) -> jump<->duck (<->jump) combos. Surges
+      // are nearly always combos. The first obstacle of a run never clusters.
+      let clusterChance = Math.min(0.8, TUNING.clusterChanceMax * difficulty + endless);
+      if (surging) clusterChance = 0.97;
       if (wasFirst) clusterChance = 0;
 
       if (Math.random() < clusterChance) {
@@ -504,8 +418,8 @@ export class ObstacleSpawner {
         const p1 = this.pickPartner(tier, wantHigh);
         if (p1) {
           this.queue.push(p1);
-          // Sometimes a third (jump-duck-jump) at high difficulty / during surges.
-          const tripleChance = (surging ? 0.6 : 0) + Math.min(0.4, difficulty * 0.25 + endless);
+          // Often a third (jump-duck-jump) at higher difficulty / during surges.
+          const tripleChance = (surging ? 0.7 : 0) + Math.min(0.55, difficulty * 0.45 + endless);
           if (Math.random() < tripleChance) {
             wantHigh = !wantHigh;
             const p2 = this.pickPartner(tier, wantHigh);
@@ -527,10 +441,10 @@ export class ObstacleSpawner {
     }
   }
 
-  /** Spawn a random unlocked obstacle (FUD comes from its own timer). */
+  /** Spawn a random unlocked obstacle and return it. */
   private spawnRandom(tier: number): Obstacle {
     const kinds = (Object.keys(SPECS) as ObstacleKind[]).filter(
-      (k) => SPECS[k].minTier <= tier && k !== 'paper'
+      (k) => SPECS[k].minTier <= tier
     );
     const kind = kinds[Math.floor(Math.random() * kinds.length)];
     return this.spawnKind(kind);
@@ -545,16 +459,15 @@ export class ObstacleSpawner {
   /**
    * Pick a partner of the requested action category (high = duck, low = jump).
    * Only steady-height, steady-speed kinds qualify so the combo's required
-   * actions stay predictable and fair: wreckedHouse (jump) and door (duck).
+   * actions stay predictable and fair: wreckedHouse (jump) and crashChart (duck).
    */
   private pickPartner(tier: number, wantHigh: boolean): ObstacleKind | null {
     const kinds = (Object.keys(SPECS) as ObstacleKind[]).filter(
       (k) =>
         SPECS[k].minTier <= tier &&
         SPECS[k].extraSpeed === 0 &&
-        k !== 'chart' &&
+        k !== 'fud' &&
         k !== 'flyingHouse' &&
-        k !== 'paper' &&
         SPECS[k].clearance > 0 === wantHigh
     );
     if (kinds.length === 0) return null;

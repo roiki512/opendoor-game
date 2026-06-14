@@ -119,22 +119,30 @@ export function drawHowTo(ctx: CanvasRenderingContext2D) {
   infoLine(ctx, 'On phone: on-screen JUMP / DUCK buttons', lx, 272);
   infoLine(ctx, 'Pause   Esc / P', lx, 296);
 
-  sectionHead(ctx, 'POWER-UPS', lx, 318);
+  sectionHead(ctx, 'POWER-UPS', lx, 322);
   spriteRow(
     ctx,
     (x, y) => drawPickupIcon(ctx, 'pill', x, y, 0.9),
-    'AI PILL — instant price bump',
+    'AI PILL — collect 3 to go FASTER',
     lx + 16,
     lx + 40,
-    350
+    352
+  );
+  spriteRow(
+    ctx,
+    (x, y) => drawPickupIcon(ctx, 'squeeze', x, y, 0.9),
+    'SHORT SQUEEZE — shield, blocks a hit (rare)',
+    lx + 16,
+    lx + 40,
+    390
   );
   spriteRow(
     ctx,
     (x, y) => drawPickupIcon(ctx, 'rocket', x, y, 0.9),
-    'ROCKET — speed burst (rare)',
+    'ROCKET — speed burst',
     lx + 16,
     lx + 40,
-    392
+    428
   );
 
   // Right column: the shorts' obstacles
@@ -142,12 +150,11 @@ export function drawHowTo(ctx: CanvasRenderingContext2D) {
   sectionHead(ctx, 'DODGE THE SHORTS', rx, 168);
   const ix = rx + 20;
   const tx = rx + 50;
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'wreckedHouse', x, y, 0.8), 'CONDEMNED HOUSE — jump', ix, tx, 200);
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'bear', x, y, 0.8), 'BEAR MARKET — jump (fast!)', ix, tx, 236);
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'chart', x, y, 1), 'RED CHART — bobs: jump it low, slip under high', ix, tx, 272);
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'door', x, y, 0.42), 'CLOSED DOOR — too tall to jump, DUCK under', ix, tx, 308);
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'paper', x, y, 0.8), 'FUD HEADLINE — falls from the sky, jump it', ix, tx, 344);
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'flyingHouse', x, y, 0.8), 'RIVAL HOUSE — zig-zags: jump low, duck high', ix, tx, 380);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'wreckedHouse', x, y, 0.8), 'CONDEMNED HOUSE — jump', ix, tx, 206);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'bear', x, y, 0.8), 'BEAR MARKET — jump (fast!)', ix, tx, 244);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'fud', x, y, 1), 'FUD REPORT — bobs: jump it low, slip under high', ix, tx, 282);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'crashChart', x, y, 0.42), 'CRASH CHART — too tall to jump, DUCK under', ix, tx, 320);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'flyingHouse', x, y, 0.8), 'RIVAL HOUSE — zig-zags: jump low, duck high', ix, tx, 358);
 
   drawButton(ctx, HOWTO_BACK_BUTTON);
   centered(ctx, '(ESC to close)', H * 0.95, 12, 'rgba(150, 190, 230, 0.7)', false, '');

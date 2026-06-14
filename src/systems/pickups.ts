@@ -2,16 +2,17 @@ import { TUNING } from '../config/tuning';
 import type { Box } from './player';
 
 // Collectibles floating along the path:
-//  - 'rocket' (🚀, rare)        -> short speed boost + shield
-//  - 'pill'   ("AI pill" capsule) -> instant price bump
-//    (a wink at Opendoor calling itself one of the most "AI-pilled" companies)
+//  - 'pill'    ("AI pill" capsule) -> collect 3 to go one step FASTER
+//  - 'rocket'  (🚀, uncommon)      -> short speed burst
+//  - 'squeeze' (short squeeze, rare) -> a shield that absorbs one hit
 // They float at jump height so you grab them mid-air — risk vs. reward.
 
-export type PickupKind = 'rocket' | 'pill';
+export type PickupKind = 'rocket' | 'pill' | 'squeeze';
 
 const ROCKET_SIZE = 26;
 const PILL_W = 34;
 const PILL_H = 18;
+const SQUEEZE_SIZE = 28;
 
 export class Pickup {
   x: number;
@@ -35,8 +36,8 @@ export class Pickup {
 
   hitbox(groundY: number): Box {
     const bob = Math.sin(this.spin) * 4;
-    const w = this.kind === 'rocket' ? ROCKET_SIZE : PILL_W;
-    const h = this.kind === 'rocket' ? ROCKET_SIZE : PILL_H;
+    const w = this.kind === 'rocket' ? ROCKET_SIZE : this.kind === 'squeeze' ? SQUEEZE_SIZE : PILL_W;
+    const h = this.kind === 'rocket' ? ROCKET_SIZE : this.kind === 'squeeze' ? SQUEEZE_SIZE : PILL_H;
     // Generous grab box — picking up should feel easy
     return {
       x: this.x - w / 2 - 6,
@@ -54,7 +55,38 @@ export class Pickup {
     ctx.save();
     ctx.translate(cx, cy);
 
-    if (this.kind === 'rocket') {
+    if (this.kind === 'squeeze') {
+      // "Short squeeze" — a glowing shield (the only source of a shield now).
+      const s = SQUEEZE_SIZE;
+      ctx.shadowColor = '#50dcff';
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = '#0e2b3a';
+      ctx.strokeStyle = '#50dcff';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(0, -s * 0.5);
+      ctx.lineTo(s * 0.42, -s * 0.3);
+      ctx.lineTo(s * 0.42, s * 0.1);
+      ctx.quadraticCurveTo(s * 0.42, s * 0.42, 0, s * 0.55);
+      ctx.quadraticCurveTo(-s * 0.42, s * 0.42, -s * 0.42, s * 0.1);
+      ctx.lineTo(-s * 0.42, -s * 0.3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      // Up-arrow inside — the price gets squeezed UP
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#50dcff';
+      ctx.beginPath();
+      ctx.moveTo(0, -s * 0.26);
+      ctx.lineTo(s * 0.22, s * 0.02);
+      ctx.lineTo(s * 0.09, s * 0.02);
+      ctx.lineTo(s * 0.09, s * 0.28);
+      ctx.lineTo(-s * 0.09, s * 0.28);
+      ctx.lineTo(-s * 0.09, s * 0.02);
+      ctx.lineTo(-s * 0.22, s * 0.02);
+      ctx.closePath();
+      ctx.fill();
+    } else if (this.kind === 'rocket') {
       // The real 🚀 — rendered as emoji text, with sparkle exhaust.
       ctx.rotate(Math.sin(this.spin * 0.7) * 0.18);
       ctx.shadowColor = '#ffb13d';
@@ -153,8 +185,12 @@ export class PickupSpawner {
 
     this.nextSpawnIn -= dt;
     if (this.nextSpawnIn <= 0) {
-      // Rockets are the rare one; pills are the common drop.
-      const kind: PickupKind = Math.random() < TUNING.rocketChance ? 'rocket' : 'pill';
+      // Pills are the common drop (they drive speed); rockets uncommon; the
+      // short-squeeze shield is rare.
+      const r = Math.random();
+      let kind: PickupKind = 'pill';
+      if (r < TUNING.squeezeChance) kind = 'squeeze';
+      else if (r < TUNING.squeezeChance + TUNING.rocketChance) kind = 'rocket';
       this.pickups.push(new Pickup(TUNING.width + 60, kind));
       this.nextSpawnIn =
         TUNING.pickupIntervalMin +
