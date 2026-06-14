@@ -1,16 +1,17 @@
 import { TUNING } from '../config/tuning';
 import type { Box } from './player';
 
-// The shorts' arsenal. Heights are relative to the ground line:
-//  - 'wreckedHouse', 'bear' sit on the ground -> must JUMP
-//  - 'paper', 'flyingHouse' fly high -> must DUCK
-//  - 'downGraph' is a tall static crash-wall, too high to jump -> must DUCK
-//  - 'missile' bobs down and up as it flies -> JUMP it when low, slip UNDER
-//    it when high (so you don't always jump)
+// The shorts' arsenal — each enemy plays differently:
+//  - 'wreckedHouse'  ground, static            -> JUMP
+//  - 'bear'          ground, charges in fast   -> JUMP
+//  - 'chart'         red chart, bobs down/up   -> JUMP it low, slip UNDER it high
+//  - 'door'          tall red closed door      -> can't be jumped, DUCK under
+//  - 'paper' (FUD)   drops from the sky, lands -> JUMP the fallen headline
+//  - 'flyingHouse'   rival, sharp zig-zag      -> JUMP it low, DUCK it high
 export type ObstacleKind =
   | 'wreckedHouse'
-  | 'downGraph'
-  | 'missile'
+  | 'chart'
+  | 'door'
   | 'paper'
   | 'flyingHouse'
   | 'bear';
@@ -28,72 +29,101 @@ interface KindSpec {
 
 const SPECS: Record<ObstacleKind, KindSpec> = {
   wreckedHouse: { w: 38, h: 36, clearance: 0, extraSpeed: 0, minTier: 0 },
-  paper: { w: 40, h: 30, clearance: 34, extraSpeed: 0, minTier: 0 },
-  // A tall static crash-wall whose top sits above the jump apex (~112px): it
-  // blocks your jump, so you must DUCK under the gap at its base.
-  downGraph: { w: 44, h: 86, clearance: 32, extraSpeed: 0, minTier: 1 },
-  // Bobs vertically as it flies (clearance comes from effClearance, not here).
-  missile: { w: 40, h: 16, clearance: 0, extraSpeed: 0, minTier: 1 },
-  // extraSpeed kept modest so these faster movers can't overtake a slower
-  // obstacle ahead of them (which could force an impossible jump+duck).
-  flyingHouse: { w: 44, h: 30, clearance: 34, extraSpeed: 60, minTier: 1 },
+  // A red chart that bobs down and up (clearance via effClearance).
+  chart: { w: 42, h: 20, clearance: 0, extraSpeed: 0, minTier: 0 },
+  // A tall "closed door": its top sits above the jump apex (~112px) so it can't
+  // be jumped — you must duck under the gap at its base. Punishes jump-spam.
+  door: { w: 40, h: 86, clearance: 32, extraSpeed: 0, minTier: 1 },
+  // FUD headline — drops from the sky (handled by the spawner's own timer).
+  paper: { w: 42, h: 28, clearance: 0, extraSpeed: 0, minTier: 1 },
+  // Rival house — sharp vertical zig-zag (clearance via effClearance).
+  flyingHouse: { w: 44, h: 30, clearance: 26, extraSpeed: 0, minTier: 1 },
   bear: { w: 44, h: 34, clearance: 0, extraSpeed: 55, minTier: 2 },
 };
 
-// Rival houses swoop up and down the whole time they travel (px amplitude).
-// Kept so the gap underneath stays duckable at the low point (never a jump).
-const FLYINGHOUSE_SWOOP = 10;
-// The "sell-off missile" bobs down and up as it flies: low => JUMP it, high =>
-// run UNDER it. clearance oscillates between ~4 (on the deck) and ~52 (overhead).
-const MISSILE_BASE = 28;
-const MISSILE_AMP = 24;
-const MISSILE_FREQ = 0.018;
+// The bobbing chart: clearance oscillates ~2 (on the deck) .. ~50 (overhead).
+const CHART_BASE = 26;
+const CHART_AMP = 24;
+const CHART_FREQ = 0.018;
+// The rival's zig-zag: clearly low (jump) .. clearly high (duck) so the read is
+// obvious. Uses a sharp triangle wave.
+const ZIG_BASE = 26;
+const ZIG_AMP = 24;
+const ZIG_FREQ = 0.014;
+// FUD drop physics.
+const FUD_GRAVITY = 3200;
+const FUD_START_CLEAR = 210;
+
+/** Sharp triangle wave: period 2π, range [-1, 1]. */
+function triWave(t: number): number {
+  const u = t / (Math.PI * 2);
+  const f = u - Math.floor(u + 0.5); // [-0.5, 0.5)
+  return 4 * Math.abs(f) - 1;
+}
 
 export class Obstacle {
   x: number;
   kind: ObstacleKind;
   spin = Math.random() * Math.PI * 2;
   fleeing = false;
-  /** Random phase so each missile's down/up rhythm is unpredictable. */
+  /** Random phase so each chart/rival's down-up rhythm is unpredictable. */
   private phase = Math.random() * Math.PI * 2;
+  /** FUD only: still falling from the sky. */
+  private falling = false;
+  private fallClear = 0;
+  private fallVy = 0;
 
   constructor(kind: ObstacleKind, x: number) {
     this.kind = kind;
     this.x = x;
+    if (kind === 'paper') {
+      this.falling = true;
+      this.fallClear = FUD_START_CLEAR;
+    }
   }
 
   get spec(): KindSpec {
     return SPECS[this.kind];
   }
 
-  /** Bottom-edge clearance. The missile's oscillates as it flies. */
+  /** Bottom-edge clearance. Chart/rival oscillate; FUD falls. */
   get effClearance(): number {
-    if (this.kind === 'missile') {
-      return MISSILE_BASE + Math.sin(this.x * MISSILE_FREQ + this.phase) * MISSILE_AMP;
+    switch (this.kind) {
+      case 'chart':
+        return CHART_BASE + Math.sin(this.x * CHART_FREQ + this.phase) * CHART_AMP;
+      case 'flyingHouse':
+        return ZIG_BASE + triWave(this.x * ZIG_FREQ + this.phase) * ZIG_AMP;
+      case 'paper':
+        return this.fallClear;
+      default:
+        return SPECS[this.kind].clearance;
     }
-    return SPECS[this.kind].clearance;
   }
   /** A "high" obstacle must be ducked under (vs. a ground one you jump over). */
   get isHigh(): boolean {
-    return SPECS[this.kind].clearance > 0; // missile base 0 -> treated as ground
+    return SPECS[this.kind].clearance > 0;
   }
 
   update(dt: number, scrollSpeed: number) {
     const flee = this.fleeing ? -2.2 : 1; // squeeze: run back off-screen right
     this.x -= (scrollSpeed + this.spec.extraSpeed) * flee * dt;
-    this.spin += dt * (this.kind === 'paper' ? 5 : 2);
+    this.spin += dt * (this.kind === 'paper' && !this.falling ? 1 : this.kind === 'paper' ? 6 : 2);
+    if (this.falling) {
+      this.fallVy += FUD_GRAVITY * dt;
+      this.fallClear -= this.fallVy * dt;
+      if (this.fallClear <= 0) {
+        this.fallClear = 0;
+        this.falling = false;
+      }
+    }
   }
 
   /** AABB in screen space; groundY sampled at the obstacle's x. */
   hitbox(groundY: number): Box {
     const s = SPECS[this.kind];
-    let bob = 0;
-    if (this.kind === 'flyingHouse') {
-      bob = Math.sin(this.x * 0.012) * FLYINGHOUSE_SWOOP; // continuous up/down swoop
-    }
     return {
       x: this.x - s.w / 2,
-      y: groundY - this.effClearance - s.h + bob,
+      y: groundY - this.effClearance - s.h,
       w: s.w,
       h: s.h,
     };
@@ -163,22 +193,20 @@ export class Obstacle {
         ctx.stroke();
         break;
       }
-      case 'downGraph': {
-        // A red crashing chart. Small + on the ground = JUMP it; tall + hanging
-        // (the duck variant) = DUCK under it. The art scales to the box.
+      case 'chart': {
+        // A small red declining chart that bobs down and up.
         ctx.fillStyle = 'rgba(20, 8, 10, 0.85)';
         ctx.fillRect(b.x, b.y, b.w, b.h);
         ctx.strokeStyle = '#ff4646';
         ctx.lineWidth = 1.5;
         ctx.strokeRect(b.x, b.y, b.w, b.h);
-        // Declining zig-zag spanning the whole box
         const pts: [number, number][] = [
-          [0.08, 0.12],
-          [0.3, 0.34],
-          [0.45, 0.24],
-          [0.66, 0.6],
-          [0.78, 0.48],
-          [0.92, 0.9],
+          [0.08, 0.16],
+          [0.32, 0.4],
+          [0.46, 0.28],
+          [0.68, 0.62],
+          [0.8, 0.5],
+          [0.92, 0.88],
         ];
         ctx.strokeStyle = '#ff4646';
         ctx.lineWidth = 2.5;
@@ -191,9 +219,8 @@ export class Obstacle {
         }
         ctx.stroke();
         ctx.shadowBlur = 0;
-        // Arrowhead at the bottom-right end of the decline
         const ex = b.x + 0.92 * b.w;
-        const ey = b.y + 0.9 * b.h;
+        const ey = b.y + 0.88 * b.h;
         ctx.fillStyle = '#ff4646';
         ctx.beginPath();
         ctx.moveTo(ex + 2, ey + 2);
@@ -203,53 +230,39 @@ export class Obstacle {
         ctx.fill();
         break;
       }
-      case 'missile': {
-        // A red "sell-off" dart firing in low, bobbing down and up.
-        ctx.translate(cx, cy);
-        const w = b.w;
-        const h = b.h;
-        // Flame tail (trailing right)
-        const flick = Math.random() * 5;
-        ctx.fillStyle = '#ffd24d';
-        ctx.beginPath();
-        ctx.moveTo(w * 0.28, -h * 0.4);
-        ctx.lineTo(w * 0.7 + flick, 0);
-        ctx.lineTo(w * 0.28, h * 0.4);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = '#ff8a3d';
-        ctx.beginPath();
-        ctx.moveTo(w * 0.28, -h * 0.24);
-        ctx.lineTo(w * 0.5 + flick * 0.5, 0);
-        ctx.lineTo(w * 0.28, h * 0.24);
-        ctx.closePath();
-        ctx.fill();
-        // Dart body (pointed left, the way it travels)
-        ctx.fillStyle = '#ff3b3b';
-        ctx.beginPath();
-        ctx.moveTo(-w * 0.5, 0); // nose
-        ctx.lineTo(-w * 0.16, -h * 0.5);
-        ctx.lineTo(w * 0.32, -h * 0.5);
-        ctx.lineTo(w * 0.32, h * 0.5);
-        ctx.lineTo(-w * 0.16, h * 0.5);
-        ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = '#7a0d0d';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-        // Down-tick fin (it's a sell-off) + glint
-        ctx.strokeStyle = '#7a0d0d';
+      case 'door': {
+        // A red "closed door" — the anti-Opendoor. Too tall to jump; slide
+        // (duck) under the gap at its base. Drawn as a red shutter coming down.
+        ctx.fillStyle = '#7c1620';
+        ctx.fillRect(b.x - 3, b.y, b.w + 6, b.h);
+        ctx.fillStyle = '#c62836';
+        ctx.fillRect(b.x, b.y, b.w, b.h);
+        ctx.strokeStyle = '#5a0f17';
         ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(w * 0.18, -h * 0.5);
-        ctx.lineTo(w * 0.34, -h * 0.95);
-        ctx.stroke();
-        ctx.fillStyle = '#ffd0d0';
-        ctx.fillRect(-w * 0.34, -h * 0.18, w * 0.16, 2.5);
+        ctx.strokeRect(b.x, b.y, b.w, b.h);
+        // Horizontal slats (shutter look)
+        ctx.strokeStyle = '#8c1a26';
+        ctx.lineWidth = 2;
+        const slats = 7;
+        for (let i = 1; i < slats; i++) {
+          const yy = b.y + (b.h / slats) * i;
+          ctx.beginPath();
+          ctx.moveTo(b.x + 2, yy);
+          ctx.lineTo(b.x + b.w - 2, yy);
+          ctx.stroke();
+        }
+        // Bottom lip + handle — the edge you duck beneath
+        ctx.fillStyle = '#5a0f17';
+        ctx.fillRect(b.x - 3, b.y + b.h - 6, b.w + 6, 6);
+        ctx.fillStyle = '#ffd84d';
+        ctx.fillRect(cx - 6, b.y + b.h - 13, 12, 4);
+        // A small red NO-ENTRY bar up top for "closed"
+        ctx.fillStyle = '#f3eee4';
+        ctx.fillRect(b.x + b.w * 0.2, b.y + b.h * 0.28, b.w * 0.6, b.h * 0.06);
         break;
       }
       case 'paper': {
-        // Tumbling FUD newspaper
+        // FUD headline — tumbles as it drops, then flutters where it landed.
         ctx.translate(cx, cy);
         ctx.rotate(Math.sin(this.spin) * 0.5);
         ctx.fillStyle = '#e8e4da';
@@ -348,8 +361,7 @@ export class Obstacle {
         break;
       }
       case 'flyingHouse': {
-        // A rival house airlifted by rotors — flying competition. Everything is
-        // drawn relative to b (the hitbox), so the post-$82 swoop carries it.
+        // A rival house airlifted by rotors — sharp zig-zag up and down.
         const hx = b.x + 6;
         const hw = b.w - 12;
         const roofH = 9;
@@ -398,6 +410,8 @@ export class ObstacleSpawner {
   /** Partners queued behind the last spawn (cluster / triple combo). */
   private queue: ObstacleKind[] = [];
   private pendingIn = 0;
+  /** Independent timer for FUD headlines raining from the sky. */
+  private fudTimer: number = TUNING.fudFirst;
   squeezeTime = 0;
   /** EARNINGS DAY volatility burst — combo-heavy while it lasts. */
   surgeTime = 0;
@@ -408,6 +422,7 @@ export class ObstacleSpawner {
     this.firstSpawnDone = false;
     this.queue = [];
     this.pendingIn = 0;
+    this.fudTimer = TUNING.fudFirst;
     this.squeezeTime = 0;
     this.surgeTime = 0;
   }
@@ -440,6 +455,27 @@ export class ObstacleSpawner {
 
     if (this.squeezeTime > 0) return; // no spawns during the squeeze
 
+    const tier = Math.min(progress, totalTiers); // which kinds are unlocked
+    // Ramp to full difficulty by ~60% of the roster, so the climb to $82 is a
+    // real test rather than only heating up at the very end.
+    const difficulty = Math.min(1, progress / Math.max(1, (totalTiers - 1) * 0.6));
+    // Past the roster, keep creeping difficulty up so endless mode stays tense.
+    const endless = Math.min(0.5, Math.max(0, progress - totalTiers) * 0.04);
+    const surging = this.surgeTime > 0;
+
+    // FUD headlines rain from the sky on their own timer, landing ahead of the
+    // player (random spot, random time) as a ground obstacle to jump.
+    if (progress >= 1) {
+      this.fudTimer -= dt;
+      if (this.fudTimer <= 0) {
+        const x = TUNING.width * 0.72 + Math.random() * (TUNING.width * 0.28 + 30);
+        this.obstacles.push(new Obstacle('paper', x));
+        this.fudTimer =
+          TUNING.fudIntervalMin +
+          Math.random() * (TUNING.fudIntervalMax - TUNING.fudIntervalMin);
+      }
+    }
+
     // Release queued cluster partners first; hold the main timer until they're out.
     if (this.queue.length > 0) {
       this.pendingIn -= dt;
@@ -449,14 +485,6 @@ export class ObstacleSpawner {
       }
       return;
     }
-
-    const tier = Math.min(progress, totalTiers); // which kinds are unlocked
-    // Ramp to full difficulty by ~60% of the roster, so the climb to $82 is a
-    // real test rather than only heating up at the very end.
-    const difficulty = Math.min(1, progress / Math.max(1, (totalTiers - 1) * 0.6));
-    // Past the roster, keep creeping difficulty up so endless mode stays tense.
-    const endless = Math.min(0.5, Math.max(0, progress - totalTiers) * 0.04);
-    const surging = this.surgeTime > 0;
 
     this.nextSpawnIn -= dt;
     if (this.nextSpawnIn <= 0) {
@@ -499,10 +527,10 @@ export class ObstacleSpawner {
     }
   }
 
-  /** Spawn a random unlocked obstacle and return it. */
+  /** Spawn a random unlocked obstacle (FUD comes from its own timer). */
   private spawnRandom(tier: number): Obstacle {
     const kinds = (Object.keys(SPECS) as ObstacleKind[]).filter(
-      (k) => SPECS[k].minTier <= tier
+      (k) => SPECS[k].minTier <= tier && k !== 'paper'
     );
     const kind = kinds[Math.floor(Math.random() * kinds.length)];
     return this.spawnKind(kind);
@@ -516,16 +544,17 @@ export class ObstacleSpawner {
 
   /**
    * Pick a partner of the requested action category (high = duck, low = jump).
-   * Only steady-speed kinds qualify (a fast charger can't overtake the pair),
-   * and downGraph is excluded since its variant is random — keeping the combo's
-   * required actions predictable and therefore fair.
+   * Only steady-height, steady-speed kinds qualify so the combo's required
+   * actions stay predictable and fair: wreckedHouse (jump) and door (duck).
    */
   private pickPartner(tier: number, wantHigh: boolean): ObstacleKind | null {
     const kinds = (Object.keys(SPECS) as ObstacleKind[]).filter(
       (k) =>
         SPECS[k].minTier <= tier &&
         SPECS[k].extraSpeed === 0 &&
-        k !== 'missile' && // its height varies — keep combo actions predictable
+        k !== 'chart' &&
+        k !== 'flyingHouse' &&
+        k !== 'paper' &&
         SPECS[k].clearance > 0 === wantHigh
     );
     if (kinds.length === 0) return null;

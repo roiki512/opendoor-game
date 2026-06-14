@@ -55,6 +55,11 @@ export const TUNING = {
   clusterGap: 0.75, // seconds between the pair (enough to land a jump, then duck)
   startGrace: 2.4, // calm seconds at the start of a run before the first short
 
+  // FUD headlines that drop from the sky on their own timer.
+  fudFirst: 6, // seconds before the first one falls
+  fudIntervalMin: 3.5,
+  fudIntervalMax: 7,
+
   // "EARNINGS DAY" volatility surges — periodic combo-dense bursts.
   surgeDuration: 5, // seconds a surge lasts
   surgeFirst: 16, // seconds into a run before the first surge
