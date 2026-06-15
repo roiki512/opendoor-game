@@ -507,7 +507,7 @@ export class Game {
           if (o.fleeing) continue;
           if (o.kind === 'pit') {
             // Rug pull: you fall in only if you're on the ground as it passes.
-            if (this.player.onGround && Math.abs(o.x - this.player.x) < o.spec.w / 2 - 12) {
+            if (this.player.onGround && Math.abs(o.x - this.player.x) < o.w / 2 - 12) {
               this.takeHit();
               break;
             }

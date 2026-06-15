@@ -65,29 +65,48 @@ function triWave(t: number): number {
 export class Obstacle {
   x: number;
   kind: ObstacleKind;
+  /** Width — usually the spec's, but pits widen with speed (set at spawn). */
+  w: number;
   spin = Math.random() * Math.PI * 2;
   fleeing = false;
   /** Whether a bait booster has already been considered for this obstacle. */
   baitDone = false;
+  /**
+   * 0..1 difficulty dial set at spawn. For FUD/rival it deepens the down-swing
+   * so its low point reaches the GROUND (must JUMP it) instead of always being
+   * duck-under-able. Higher speed/progress -> swings all the way to the floor.
+   */
+  intensity = 0;
   /** Random phase so each FUD/rival's down-up rhythm is unpredictable. */
   private phase = Math.random() * Math.PI * 2;
 
   constructor(kind: ObstacleKind, x: number) {
     this.kind = kind;
     this.x = x;
+    this.w = SPECS[kind].w;
   }
 
   get spec(): KindSpec {
     return SPECS[this.kind];
   }
 
-  /** Bottom-edge clearance. FUD bobs; rival zig-zags. */
+  /** Bottom-edge clearance. FUD bobs; rival zig-zags — and at high intensity
+   *  both swing down to the floor so you must JUMP, not duck. */
   get effClearance(): number {
+    const I = this.intensity;
     switch (this.kind) {
-      case 'fud':
-        return FUD_BASE + Math.sin(this.x * FUD_FREQ + this.phase) * FUD_AMP;
-      case 'flyingHouse':
-        return ZIG_BASE + triWave(this.x * ZIG_FREQ + this.phase) * ZIG_AMP;
+      case 'fud': {
+        // I=0: clearance 22..50 (always duckable). I=1: 0..50 (low point = floor).
+        const center = FUD_BASE - 11 * I;
+        const amp = FUD_AMP + 11 * I;
+        return Math.max(0, center + Math.sin(this.x * FUD_FREQ + this.phase) * amp);
+      }
+      case 'flyingHouse': {
+        // I=0: 16..52. I=1: 0..52 (dives to the ground).
+        const center = ZIG_BASE - 8 * I;
+        const amp = ZIG_AMP + 8 * I;
+        return Math.max(0, center + triWave(this.x * ZIG_FREQ + this.phase) * amp);
+      }
       default:
         return SPECS[this.kind].clearance;
     }
@@ -107,9 +126,9 @@ export class Obstacle {
   hitbox(groundY: number): Box {
     const s = SPECS[this.kind];
     return {
-      x: this.x - s.w / 2,
+      x: this.x - this.w / 2,
       y: groundY - this.effClearance - s.h,
-      w: s.w,
+      w: this.w,
       h: s.h,
     };
   }
@@ -322,7 +341,8 @@ export class Obstacle {
         ctx.fillStyle = '#04060c';
         ctx.fillRect(b.x, top, w, depth);
         // Row of impaling spikes on the floor — telegraphs "this WILL hurt".
-        const spikeCount = 6;
+        // Count scales with width so wide (high-speed) pits stay bristling.
+        const spikeCount = Math.max(6, Math.round(w / 16));
         const sw = w / spikeCount;
         const spikeH = 20;
         const floorY = top + depth;
@@ -433,6 +453,10 @@ export class ObstacleSpawner {
   /** Partners queued behind the last spawn (cluster / triple combo). */
   private queue: ObstacleKind[] = [];
   private pendingIn = 0;
+  /** Gap between cluster partners — shrinks with speed so you must short-hop. */
+  private clusterGapCur: number = TUNING.clusterGap;
+  /** Intensity applied to the current cluster's partners (see Obstacle). */
+  private clusterIntensity = 0;
   /** EARNINGS DAY volatility burst — combo-heavy while it lasts. */
   surgeTime = 0;
 
@@ -484,26 +508,45 @@ export class ObstacleSpawner {
     if (this.queue.length > 0) {
       this.pendingIn -= dt;
       if (this.pendingIn <= 0) {
-        this.spawnKind(this.queue.shift()!);
-        if (this.queue.length > 0) this.pendingIn = TUNING.clusterGap;
+        this.spawnKind(this.queue.shift()!, this.clusterIntensity);
+        if (this.queue.length > 0) this.pendingIn = this.clusterGapCur;
       }
       return;
     }
 
     this.nextSpawnIn -= dt;
     if (this.nextSpawnIn <= 0) {
-      // Rug-pull pits grow more common the deeper you climb past their unlock.
+      // How fast are we going, on a 0 (base) .. 1 (max scroll) dial? This — not
+      // just progress — now drives the squeeze: faster = denser, deeper FUD/rival
+      // dives, wider pits, more combos. So speed makes it HARDER, not easier.
+      const speedRatio = scrollSpeed / TUNING.baseScroll;
+      const speedT = Math.min(
+        1,
+        Math.max(0, (speedRatio - 1) / (TUNING.maxScroll / TUNING.baseScroll - 1))
+      );
+      // The difficulty dial for ground-diving FUD/rivals: ramps in with speed
+      // and progress so high-speed play forces real jump-vs-duck reads.
+      const intensity = Math.min(1, difficulty * 0.45 + speedT * 0.8 + endless);
+      this.clusterIntensity = intensity;
+
+      // Rug-pull pits grow more common the deeper you climb, and WIDER the faster
+      // you go (past a threshold) so clearing one needs a well-timed full jump.
       const pitWeight = Math.min(
         3,
         0.6 + Math.max(0, progress - SPECS.pit.minTier) * 0.3 + endless * 3
       );
-      const primary = this.spawnRandom(tier, blockWall, pitWeight);
+      const pitW = SPECS.pit.w + Math.max(0, speedT - 0.2) * 230;
+      const primary = this.spawnRandom(tier, blockWall, pitWeight, intensity, pitW);
       const wasFirst = !this.firstSpawnDone;
       this.firstSpawnDone = true;
 
+      // Cluster partners come CLOSER as you speed up, so you can't hold one long
+      // jump over a pair — you must short-hop to land and duck the next in time.
+      this.clusterGapCur = TUNING.clusterGap * (1 - speedT * 0.42);
+
       // Bring complementary partner(s) -> jump<->duck (<->jump) combos. Surges
       // are nearly always combos. The first obstacle of a run never combos.
-      let clusterChance = Math.min(0.8, TUNING.clusterChanceMax * difficulty + endless);
+      let clusterChance = Math.min(0.9, TUNING.clusterChanceMax * difficulty + endless + speedT * 0.3);
       if (surging) clusterChance = 0.97;
 
       // Bears and rug-pull pits are never standalone — they always arrive
@@ -518,22 +561,24 @@ export class ObstacleSpawner {
         const extra =
           1 + (Math.random() < 0.45 + endless ? 1 : 0) + (Math.random() < endless ? 1 : 0);
         for (let i = 0; i < extra; i++) this.queue.push('bear');
-        this.pendingIn = TUNING.clusterGap;
+        this.pendingIn = this.clusterGapCur;
       } else if (bearPrimary || pitPrimary || Math.random() < clusterChance) {
         let wantHigh = !primary.isHigh; // first partner is the opposite action
         const p1 = this.pickPartner(tier, wantHigh);
         if (p1) {
           this.queue.push(p1);
-          // Longer jump-duck-jump(-duck) chains at higher difficulty / surges.
-          let chain = (surging ? 0.7 : 0) + Math.min(0.7, difficulty * 0.5 + endless);
-          while (Math.random() < chain && this.queue.length < 4) {
+          // Longer jump-duck-jump(-duck) chains at higher difficulty / speed / surges.
+          let chain =
+            (surging ? 0.7 : 0) + Math.min(0.85, difficulty * 0.5 + endless + speedT * 0.35);
+          const maxLen = speedT > 0.6 ? 5 : 4;
+          while (Math.random() < chain && this.queue.length < maxLen) {
             wantHigh = !wantHigh;
             const pn = this.pickPartner(tier, wantHigh);
             if (!pn) break;
             this.queue.push(pn);
-            chain *= 0.7; // each extra link is less likely
+            chain *= 0.72; // each extra link is less likely
           }
-          this.pendingIn = TUNING.clusterGap;
+          this.pendingIn = this.clusterGapCur;
         }
       }
 
@@ -544,7 +589,6 @@ export class ObstacleSpawner {
       const jitter = 1 + (Math.random() * 2 - 1) * TUNING.spawnJitter;
       // The minimum gap TIGHTENS as you speed up — otherwise a fixed-airtime
       // jump sails over the (speed-stretched) gaps and high speed feels easy.
-      const speedRatio = scrollSpeed / TUNING.baseScroll;
       const floor = Math.max(
         TUNING.spawnFloorMin,
         TUNING.spawnFloorBase - (speedRatio - 1) * TUNING.spawnFloorSpeedDrop - endless * 0.06
@@ -555,7 +599,13 @@ export class ObstacleSpawner {
   }
 
   /** Spawn a random unlocked obstacle (bears/pits weighted) and return it. */
-  private spawnRandom(tier: number, blockWall = false, pitWeight = 1): Obstacle {
+  private spawnRandom(
+    tier: number,
+    blockWall = false,
+    pitWeight = 1,
+    intensity = 0,
+    pitW = SPECS.pit.w
+  ): Obstacle {
     const kinds = (Object.keys(SPECS) as ObstacleKind[]).filter(
       (k) => SPECS[k].minTier <= tier && !(blockWall && k === 'crashChart')
     );
@@ -571,11 +621,13 @@ export class ObstacleSpawner {
         break;
       }
     }
-    return this.spawnKind(kind);
+    return this.spawnKind(kind, intensity, kind === 'pit' ? pitW : undefined);
   }
 
-  private spawnKind(kind: ObstacleKind): Obstacle {
+  private spawnKind(kind: ObstacleKind, intensity = 0, w?: number): Obstacle {
     const o = new Obstacle(kind, TUNING.width + 80);
+    o.intensity = intensity;
+    if (w !== undefined) o.w = w;
     this.obstacles.push(o);
     return o;
   }

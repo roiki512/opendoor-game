@@ -44,18 +44,18 @@ export const TUNING = {
 
   // Obstacles
   spawnIntervalStart: 1.9, // average seconds between obstacles at game start
-  spawnIntervalMin: 0.78, // floor at max difficulty
+  spawnIntervalMin: 0.72, // floor at max difficulty
   spawnJitter: 0.55, // +/- randomness fraction of the interval
   // Minimum gap between obstacles, which tightens as scroll speed climbs so the
   // late/fast game doesn't get easy (fixed-airtime jumps sailing over big gaps).
   spawnFloorBase: 0.82, // floor at base speed
-  spawnFloorSpeedDrop: 0.13, // how much the floor drops per +1x speed ratio
-  spawnFloorMin: 0.6, // hard floor (keeps consecutive jumps/ducks fair)
+  spawnFloorSpeedDrop: 0.2, // how much the floor drops per +1x speed ratio
+  spawnFloorMin: 0.44, // hard floor (keeps consecutive jumps/ducks just fair)
   shieldDuration: 10, // shield (short-squeeze item): absorbs one hit or expires
 
   // Cluster combos — an obstacle often brings a complementary partner (jump then
   // a duck, or jump-duck-jump) close behind. Drives the jump<->duck rhythm.
-  clusterChanceMax: 0.6, // partner chance at full difficulty
+  clusterChanceMax: 0.68, // partner chance at full difficulty
   clusterGap: 0.75, // seconds between the pair (enough to land a jump, then duck)
   bearWeight: 1.6, // how much more often a spawn is a bear vs. another kind
   bearPackChance: 0.4, // chance a bear charges in as a pack of 2-3
