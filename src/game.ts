@@ -73,6 +73,8 @@ export class Game {
   private rocketTime = 0;
   /** Seconds left on a magnet's pull. */
   private magnetTime = 0;
+  /** Whether the one guaranteed "Kaz joins" magnet has been queued yet. */
+  private magnetIntroDone = false;
   /** Countdown to the next EARNINGS DAY volatility surge. */
   private surgeTimer: number = TUNING.surgeFirst;
 
@@ -250,6 +252,7 @@ export class Game {
     this.paused = false;
     this.rocketTime = 0;
     this.magnetTime = 0;
+    this.magnetIntroDone = false;
     this.surgeTimer = TUNING.surgeFirst;
     this.highlightIndex = -1;
     this.enteringName = false;
@@ -458,6 +461,12 @@ export class Game {
         this.price.update(dt);
         this.checkMilestones();
 
+        // The moment Kaz joins ($4), guarantee one Talent Magnet scrolls in.
+        if (!this.magnetIntroDone && this.price.price >= TUNING.magnetUnlockPrice) {
+          this.magnetIntroDone = true;
+          this.pickups.queueMagnet();
+        }
+
         this.chart.update(dt, scroll);
 
         if (this.input.consumeJump() && this.player.tryJump()) this.sound.jump();
@@ -475,8 +484,14 @@ export class Game {
         const wallXs = this.spawner.obstacles
           .filter((o) => o.kind === 'crashChart')
           .map((o) => o.x);
-        // Short-squeeze shields only start dropping once you've passed $34.
-        this.pickups.update(dt, scroll, this.price.price >= 34, wallXs);
+        // Magnet only drops after Kaz joins ($4); short-squeeze shields past $34.
+        this.pickups.update(
+          dt,
+          scroll,
+          this.price.price >= 34,
+          wallXs,
+          this.price.price >= TUNING.magnetUnlockPrice
+        );
         // Backstop: drop any booster that still lands beside a chart while it's
         // still off the right edge (invisible to the player).
         for (const p of this.pickups.pickups) {

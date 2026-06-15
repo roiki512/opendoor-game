@@ -203,10 +203,19 @@ export function drawPickupIcon(
 export class PickupSpawner {
   pickups: Pickup[] = [];
   private nextSpawnIn = 5;
+  /** When set, the next spawn is forced to this kind (e.g. the $4 Kaz magnet). */
+  private forceNext: PickupKind | null = null;
 
   reset() {
     this.pickups = [];
     this.nextSpawnIn = 5;
+    this.forceNext = null;
+  }
+
+  /** Guarantee a magnet scrolls in shortly (used when Kaz joins at $4). */
+  queueMagnet(delay = 1.8) {
+    this.forceNext = 'magnet';
+    this.nextSpawnIn = delay;
   }
 
   /**
@@ -219,7 +228,13 @@ export class PickupSpawner {
     this.pickups.push(p);
   }
 
-  update(dt: number, scrollSpeed: number, allowSqueeze = true, wallXs: number[] = []) {
+  update(
+    dt: number,
+    scrollSpeed: number,
+    allowSqueeze = true,
+    wallXs: number[] = [],
+    allowMagnet = true
+  ) {
     for (const p of this.pickups) p.update(dt, scrollSpeed);
     this.pickups = this.pickups.filter((p) => p.x > -60 && !p.collected);
 
@@ -232,14 +247,21 @@ export class PickupSpawner {
         this.nextSpawnIn = 0.4;
         return;
       }
-      // Pills are the common drop (they drive speed); magnet/rocket uncommon;
-      // the short-squeeze shield is rare and only unlocks past $34.
-      const r = Math.random();
-      let kind: PickupKind = 'pill';
-      let t = 0;
-      if (allowSqueeze && r < (t += TUNING.squeezeChance)) kind = 'squeeze';
-      else if (r < (t += TUNING.magnetChance)) kind = 'magnet';
-      else if (r < (t += TUNING.rocketChance)) kind = 'rocket';
+      // A forced kind (the guaranteed $4 Kaz magnet) takes priority. Otherwise:
+      // pills are the common drop (they drive speed); magnet/rocket uncommon;
+      // the magnet only after Kaz joins ($4), squeeze rare and only past $34.
+      let kind: PickupKind;
+      if (this.forceNext) {
+        kind = this.forceNext;
+        this.forceNext = null;
+      } else {
+        const r = Math.random();
+        kind = 'pill';
+        let t = 0;
+        if (allowSqueeze && r < (t += TUNING.squeezeChance)) kind = 'squeeze';
+        else if (allowMagnet && r < (t += TUNING.magnetChance)) kind = 'magnet';
+        else if (r < (t += TUNING.rocketChance)) kind = 'rocket';
+      }
       this.pickups.push(new Pickup(TUNING.width + 60, kind));
       this.nextSpawnIn =
         TUNING.pickupIntervalMin +

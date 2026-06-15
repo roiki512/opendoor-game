@@ -75,6 +75,7 @@ export const TUNING = {
   // Collectible pickups
   pickupPriceBoost: 1.03, // AI pill: small instant price nudge on top of speed
   squeezeChance: 0.1, // chance a spawned pickup is the rare short-squeeze shield
+  magnetUnlockPrice: 4, // magnet only drops once Kaz joins (the $4 milestone)
   magnetChance: 0.1, // chance a spawned pickup is a magnet
   magnetTime: 5, // seconds the magnet pulls in nearby pills
   magnetRange: 430, // px ahead the magnet reaches
