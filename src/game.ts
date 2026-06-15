@@ -549,7 +549,7 @@ export class Game {
             } else if (p.kind === 'magnet') {
               this.magnetTime = TUNING.magnetTime;
               this.sound.boostPickup();
-              this.particles.floatText(p.x, py - 90, '🧲 MAGNET!', '#39c2ff');
+              this.particles.floatText(p.x, py - 90, "🧲 KAZ'S TALENT MAGNET!", '#39c2ff');
             } else {
               // AI pill: a small price nudge, and every few pills steps up speed.
               const gained = this.price.bump(TUNING.pickupPriceBoost);

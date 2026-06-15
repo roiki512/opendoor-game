@@ -181,7 +181,7 @@ export function drawHowTo(ctx: CanvasRenderingContext2D) {
   const pIx = lx + 18;
   const pTx = lx + 44;
   spriteRow(ctx, (x, y) => drawPickupIcon(ctx, 'pill', x, y, 0.9), 'AI PILL — grab 3 to go FASTER', pIx, pTx, 286);
-  spriteRow(ctx, (x, y) => drawPickupIcon(ctx, 'magnet', x, y, 0.9), 'MAGNET — pulls in nearby pills', pIx, pTx, 318);
+  spriteRow(ctx, (x, y) => drawPickupIcon(ctx, 'magnet', x, y, 0.9), "KAZ'S TALENT MAGNET — pulls in nearby pills", pIx, pTx, 318);
   spriteRow(ctx, (x, y) => drawPickupIcon(ctx, 'squeeze', x, y, 0.9), 'SHORT SQUEEZE — shield, blocks 1 hit', pIx, pTx, 350);
   spriteRow(ctx, (x, y) => drawPickupIcon(ctx, 'rocket', x, y, 0.9), 'ROCKET — quick speed burst', pIx, pTx, 382);
 
