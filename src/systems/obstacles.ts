@@ -321,6 +321,36 @@ export class Obstacle {
         const depth = 58;
         ctx.fillStyle = '#04060c';
         ctx.fillRect(b.x, top, w, depth);
+        // Row of impaling spikes on the floor — telegraphs "this WILL hurt".
+        const spikeCount = 6;
+        const sw = w / spikeCount;
+        const spikeH = 20;
+        const floorY = top + depth;
+        ctx.fillStyle = '#c9ccd4'; // steel
+        ctx.strokeStyle = '#6b6f78';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let i = 0; i < spikeCount; i++) {
+          const sx = b.x + i * sw;
+          ctx.moveTo(sx, floorY);
+          ctx.lineTo(sx + sw / 2, floorY - spikeH);
+          ctx.lineTo(sx + sw, floorY);
+        }
+        ctx.fill();
+        ctx.stroke();
+        // Bloody-red tips so the threat reads instantly.
+        ctx.fillStyle = '#ff4646';
+        ctx.shadowColor = '#ff4646';
+        ctx.shadowBlur = 5;
+        ctx.beginPath();
+        for (let i = 0; i < spikeCount; i++) {
+          const sx = b.x + i * sw;
+          ctx.moveTo(sx + sw * 0.32, floorY - spikeH * 0.4);
+          ctx.lineTo(sx + sw / 2, floorY - spikeH);
+          ctx.lineTo(sx + sw * 0.68, floorY - spikeH * 0.4);
+        }
+        ctx.fill();
+        ctx.shadowBlur = 0;
         // Torn red edges (the rug yanked out from under you)
         ctx.strokeStyle = '#ff4646';
         ctx.lineWidth = 3;
@@ -462,7 +492,12 @@ export class ObstacleSpawner {
 
     this.nextSpawnIn -= dt;
     if (this.nextSpawnIn <= 0) {
-      const primary = this.spawnRandom(tier, blockWall);
+      // Rug-pull pits grow more common the deeper you climb past their unlock.
+      const pitWeight = Math.min(
+        3,
+        0.6 + Math.max(0, progress - SPECS.pit.minTier) * 0.3 + endless * 3
+      );
+      const primary = this.spawnRandom(tier, blockWall, pitWeight);
       const wasFirst = !this.firstSpawnDone;
       this.firstSpawnDone = true;
 
@@ -471,8 +506,10 @@ export class ObstacleSpawner {
       let clusterChance = Math.min(0.8, TUNING.clusterChanceMax * difficulty + endless);
       if (surging) clusterChance = 0.97;
 
-      // Bears are never standalone — they always charge in alongside something.
+      // Bears and rug-pull pits are never standalone — they always arrive
+      // alongside something (a pit is a jump-across, then react to the partner).
       const bearPrimary = primary.kind === 'bear';
+      const pitPrimary = primary.kind === 'pit';
 
       if (wasFirst) {
         // no combo on the very first obstacle
@@ -482,7 +519,7 @@ export class ObstacleSpawner {
           1 + (Math.random() < 0.45 + endless ? 1 : 0) + (Math.random() < endless ? 1 : 0);
         for (let i = 0; i < extra; i++) this.queue.push('bear');
         this.pendingIn = TUNING.clusterGap;
-      } else if (bearPrimary || Math.random() < clusterChance) {
+      } else if (bearPrimary || pitPrimary || Math.random() < clusterChance) {
         let wantHigh = !primary.isHigh; // first partner is the opposite action
         const p1 = this.pickPartner(tier, wantHigh);
         if (p1) {
@@ -517,12 +554,14 @@ export class ObstacleSpawner {
     }
   }
 
-  /** Spawn a random unlocked obstacle (bears weighted heavier) and return it. */
-  private spawnRandom(tier: number, blockWall = false): Obstacle {
+  /** Spawn a random unlocked obstacle (bears/pits weighted) and return it. */
+  private spawnRandom(tier: number, blockWall = false, pitWeight = 1): Obstacle {
     const kinds = (Object.keys(SPECS) as ObstacleKind[]).filter(
       (k) => SPECS[k].minTier <= tier && !(blockWall && k === 'crashChart')
     );
-    const weights = kinds.map((k) => (k === 'bear' ? TUNING.bearWeight : 1));
+    const weights = kinds.map((k) =>
+      k === 'bear' ? TUNING.bearWeight : k === 'pit' ? pitWeight : 1
+    );
     let r = Math.random() * weights.reduce((a, b) => a + b, 0);
     let kind = kinds[kinds.length - 1];
     for (let i = 0; i < kinds.length; i++) {
