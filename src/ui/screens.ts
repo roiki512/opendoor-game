@@ -55,17 +55,23 @@ export function drawTitle(ctx: CanvasRenderingContext2D) {
 
 export const HOWTO_BACK_BUTTON: ButtonRect = {
   x: W / 2 - 90,
-  y: H * 0.88,
+  y: H * 0.92,
   w: 180,
   h: 38,
   label: '‹ BACK',
 };
 
 function sectionHead(ctx: CanvasRenderingContext2D, text: string, x: number, y: number) {
-  ctx.font = `bold 15px ${MONO}`;
+  ctx.font = `bold 14px ${MONO}`;
   ctx.textAlign = 'left';
   ctx.fillStyle = '#ffd84d';
   ctx.fillText(text, x, y);
+  ctx.strokeStyle = 'rgba(255, 216, 77, 0.3)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x, y + 7);
+  ctx.lineTo(x + ctx.measureText(text).width, y + 7);
+  ctx.stroke();
 }
 
 function infoLine(ctx: CanvasRenderingContext2D, text: string, x: number, y: number) {
@@ -88,57 +94,109 @@ function spriteRow(
   infoLine(ctx, label, textX, y + 4);
 }
 
+/** A little rounded "keyboard key" cap with a label; returns the next x. */
+function keycap(ctx: CanvasRenderingContext2D, label: string, x: number, y: number, accent: string): number {
+  ctx.font = `bold 13px ${MONO}`;
+  const w = Math.max(28, ctx.measureText(label).width + 16);
+  const h = 26;
+  ctx.fillStyle = 'rgba(38, 54, 80, 0.95)';
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 5);
+  ctx.fill();
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = '#eaf2fb';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, x + w / 2, y + h / 2 + 5);
+  ctx.textAlign = 'left';
+  return x + w + 8;
+}
+
+/** One control card: a titled panel with key-caps and a one-line tip. */
+function controlCard(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  accent: string,
+  title: string,
+  keys: string[],
+  note: string
+) {
+  ctx.fillStyle = 'rgba(12, 20, 34, 0.95)';
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 9);
+  ctx.fill();
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // Title
+  ctx.font = `bold 17px ${MONO}`;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 8;
+  ctx.fillText(title, x + 16, y + 27);
+  ctx.shadowBlur = 0;
+  // Key caps
+  let kx = x + 16;
+  for (const k of keys) kx = keycap(ctx, k, kx, y + 38, accent);
+  // Tip
+  ctx.font = `12px ${MONO}`;
+  ctx.fillStyle = '#9fb6cc';
+  ctx.textAlign = 'left';
+  ctx.fillText(note, x + 16, y + 82);
+}
+
 export function drawHowTo(ctx: CanvasRenderingContext2D) {
-  dim(ctx, 0.93);
-  centered(ctx, 'HOW TO PLAY', H * 0.1, 30, '#ffd84d', true);
+  // Near-solid backdrop so the title menu underneath doesn't bleed through.
+  ctx.fillStyle = '#070b12';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(10, 16, 28, 0.55)';
+  ctx.fillRect(0, 0, W, H);
+
+  centered(ctx, 'HOW TO PLAY', 52, 28, '#ffd84d', true);
   centered(
     ctx,
-    "You're the $OPEN share price. Run up the chart from the $0.51 all-time low",
-    H * 0.18,
+    'You ARE the $OPEN price — run up the chart, dodge the shorts, climb FASTER.',
+    84,
     13,
-    '#c9d8ea',
-    false,
-    ''
-  );
-  centered(
-    ctx,
-    'to $82 and far beyond — grab power-ups, dodge the short sellers, climb FASTER.',
-    H * 0.225,
-    13,
-    '#c9d8ea',
+    '#9fb6cc',
     false,
     ''
   );
 
-  // Left column: controls + power-ups
+  // --- Controls: two clear cards (the part that confused people) ---
+  controlCard(ctx, 70, 104, 380, 92, '#37d67a', '▲  JUMP', ['SPACE', '↑', 'W'],
+    'Hold = jump higher   ·   tap = short hop');
+  controlCard(ctx, 510, 104, 380, 92, '#39c2ff', '▼  DUCK', ['↓', 'S'],
+    'Hold to stay down   ·   in mid-air = drop fast');
+  centered(ctx, 'PAUSE  ESC / P          ON PHONE  use the on-screen ▲ / ▼ buttons', 222, 12, '#7e98b4', false, '');
+
+  // --- Power-ups (left) and the shorts (right) ---
   const lx = 70;
-  sectionHead(ctx, 'CONTROLS', lx, 175);
-  infoLine(ctx, 'JUMP   Space / ↑ / W  •  tap', lx, 202);
-  infoLine(ctx, '  hold longer = jump higher', lx, 224);
-  infoLine(ctx, 'DUCK   ↓ / S  •  hold', lx, 248);
-  infoLine(ctx, 'On phone: on-screen JUMP / DUCK buttons', lx, 272);
-  infoLine(ctx, 'Pause   Esc / P', lx, 296);
+  sectionHead(ctx, 'POWER-UPS  (collect these)', lx, 256);
+  const pIx = lx + 18;
+  const pTx = lx + 44;
+  spriteRow(ctx, (x, y) => drawPickupIcon(ctx, 'pill', x, y, 0.9), 'AI PILL — grab 3 to go FASTER', pIx, pTx, 286);
+  spriteRow(ctx, (x, y) => drawPickupIcon(ctx, 'magnet', x, y, 0.9), 'MAGNET — pulls in nearby pills', pIx, pTx, 318);
+  spriteRow(ctx, (x, y) => drawPickupIcon(ctx, 'squeeze', x, y, 0.9), 'SHORT SQUEEZE — shield, blocks 1 hit', pIx, pTx, 350);
+  spriteRow(ctx, (x, y) => drawPickupIcon(ctx, 'rocket', x, y, 0.9), 'ROCKET — quick speed burst', pIx, pTx, 382);
 
-  sectionHead(ctx, 'POWER-UPS', lx, 320);
-  spriteRow(ctx, (x, y) => drawPickupIcon(ctx, 'pill', x, y, 0.9), 'AI PILL — collect 3 to go FASTER', lx + 16, lx + 40, 346);
-  spriteRow(ctx, (x, y) => drawPickupIcon(ctx, 'magnet', x, y, 0.9), 'MAGNET — pulls in nearby pills', lx + 16, lx + 40, 378);
-  spriteRow(ctx, (x, y) => drawPickupIcon(ctx, 'squeeze', x, y, 0.9), 'SHORT SQUEEZE — shield, blocks a hit (rare)', lx + 16, lx + 40, 410);
-  spriteRow(ctx, (x, y) => drawPickupIcon(ctx, 'rocket', x, y, 0.9), 'ROCKET — speed burst', lx + 16, lx + 40, 442);
-
-  // Right column: the shorts' obstacles
-  const rx = 520;
-  sectionHead(ctx, 'DODGE THE SHORTS', rx, 168);
+  const rx = 510;
+  sectionHead(ctx, 'DODGE THE SHORTS  (avoid these)', rx, 256);
   const ix = rx + 20;
-  const tx = rx + 50;
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'wreckedHouse', x, y, 0.75), 'CONDEMNED HOUSE — jump', ix, tx, 198);
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'bear', x, y, 0.75), 'BEAR MARKET — jump (fast!)', ix, tx, 234);
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'fud', x, y, 0.95), 'FUD REPORT — bobs: jump it low, slip under high', ix, tx, 270);
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'crashChart', x, y, 0.4), 'CRASH CHART — too tall to jump, DUCK under', ix, tx, 306);
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'flyingHouse', x, y, 0.75), 'RIVAL HOUSE — zig-zags: jump low, duck high', ix, tx, 342);
-  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'pit', x, y, 0.55), 'RUG PULL — a gap in the floor, JUMP across', ix, tx, 378);
+  const tx = rx + 48;
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'wreckedHouse', x, y, 0.7), 'WRECKED HOUSE — jump over', ix, tx, 286);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'bear', x, y, 0.7), 'BEAR — jump (charges fast!)', ix, tx, 318);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'fud', x, y, 0.9), 'FUD — jump if low, duck if high', ix, tx, 350);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'crashChart', x, y, 0.38), 'CRASH WALL — too tall, duck under', ix, tx, 382);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'flyingHouse', x, y, 0.7), 'RIVAL — jump if low, duck if high', ix, tx, 414);
+  spriteRow(ctx, (x, y) => drawObstacleIcon(ctx, 'pit', x, y, 0.5), 'RUG-PULL PIT — jump across the gap', ix, tx, 446);
 
   drawButton(ctx, HOWTO_BACK_BUTTON);
-  centered(ctx, '(ESC to close)', H * 0.95, 12, 'rgba(150, 190, 230, 0.7)', false, '');
   ctx.textAlign = 'left';
 }
 
